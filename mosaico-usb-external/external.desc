@@ -1,0 +1,2 @@
+name: ESP_LINUX_BSP
+desc: ESP32-S31 Linux Buildroot integration

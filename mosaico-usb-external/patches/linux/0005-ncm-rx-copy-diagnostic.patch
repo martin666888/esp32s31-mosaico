@@ -1,0 +1,12 @@
+--- a/drivers/usb/gadget/function/f_ncm.c
++++ b/drivers/usb/gadget/function/f_ncm.c
+@@ -1327,6 +1327,9 @@
+ 			skb_put_data(skb2, ntb_ptr + index,
+ 				     dg_len - crc_len);
+ 
++			if (memcmp(skb2->data, ntb_ptr + index, dg_len - crc_len))
++				pr_warn_ratelimited("NCM receive copy mismatch length=%u\n", dg_len - crc_len);
++
+ 			skb_queue_tail(list, skb2);
+ 
+ 			ndp_len -= 2 * (opts->dgram_item_len * 2);

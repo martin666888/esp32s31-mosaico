@@ -1,0 +1,20 @@
+{
+  "linux": {
+    "upstream_url": "https://mirrors.tuna.tsinghua.edu.cn/kernel/v6.x/linux-6.18.tar.xz",
+    "base_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "base_tree": "61e7217a84de6106ad5cc06aa62164e1862d2bdc",
+    "commit": "dc0e3821e39bd7c169cefd274691e1998a844028",
+    "tree": "5dc7875e09afffc6e14ebae172bac389848696bf",
+    "patch": "linux-espressif.patch",
+    "patch_sha256": "dbe97746da6bd103ac378900c48f5be4fb1aee6c9d08628919d75e24d6a33e7b"
+  },
+  "u-boot": {
+    "upstream_url": "https://mirrors.nju.edu.cn/buildroot/uboot/u-boot-2024.07.tar.bz2",
+    "base_commit": "3f772959501c99fbe5aa0b22a36efe3478d1ae1c",
+    "base_tree": "85e865b4f952c04a11fd9029bf5edf49818d202d",
+    "commit": "b2ec9ae21622f92d35462f5ae3bf053466998cc6",
+    "tree": "e873e5bef02ab70c1cc1068549ccafe1183544a9",
+    "patch": "u-boot-espressif.patch",
+    "patch_sha256": "374041853a08f0efd513cd5f5e90580849b2e3120b360869104cb50f06d1ca3f"
+  }
+}

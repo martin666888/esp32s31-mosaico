@@ -1,0 +1,30 @@
+{
+  "linux": {
+    "file": "/userdata/esp32s31/archives/linux-dc0e3821e39bd7c169cefd274691e1998a844028-reconstructed.tar.gz",
+    "sha256": "37c98ed966e9b052cf6529fd5c2e06680cc4ce956f132b064ccf5bd3af74746a",
+    "size": 260439539,
+    "verified_git_tree": "5dc7875e09afffc6e14ebae172bac389848696bf",
+    "upstream_url": "https://mirrors.tuna.tsinghua.edu.cn/kernel/v6.x/linux-6.18.tar.xz",
+    "upstream_sha256": "9106a4605da9e31ff17659d958782b815f9591ab308d03b0ee21aad6c7dced4b",
+    "patch_sha256": "dbe97746da6bd103ac378900c48f5be4fb1aee6c9d08628919d75e24d6a33e7b"
+  },
+  "u-boot": {
+    "file": "/userdata/esp32s31/archives/u-boot-b2ec9ae21622f92d35462f5ae3bf053466998cc6-reconstructed.tar.gz",
+    "sha256": "738d44878439c88994bfc81f279e029e48ca56553b9473cec37cd643619daffb",
+    "size": 37275369,
+    "verified_git_tree": "e873e5bef02ab70c1cc1068549ccafe1183544a9",
+    "upstream_url": "https://mirrors.nju.edu.cn/buildroot/uboot/u-boot-2024.07.tar.bz2",
+    "upstream_sha256": "f591da9ab90ef3d6b3d173766d0ddff90c4ed7330680897486117df390d83c8f",
+    "patch_sha256": "374041853a08f0efd513cd5f5e90580849b2e3120b360869104cb50f06d1ca3f"
+  },
+  "opensbi": {
+    "file": "/userdata/esp32s31/archives/opensbi-5395e03e1cb295257142cfdeaade6334f1543bcb.tar.gz",
+    "sha256": "050b488c6fed74f20ebf3cd6fc17a57242aa733cedcbf5cfcc937c922873021f",
+    "size": 487689
+  },
+  "esp-linux-bsp": {
+    "file": "/userdata/esp32s31/archives/esp-linux-bsp-22455bf67ccc1aace91a547557af43fd85192281.tar.gz",
+    "sha256": "a9e563353e46c86f6311410a181ec39d5244c7f2ebba1c72b12440cc606a4b32",
+    "size": 9925
+  }
+}

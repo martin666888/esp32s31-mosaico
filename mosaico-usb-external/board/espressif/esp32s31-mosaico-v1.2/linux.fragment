@@ -1,0 +1,6 @@
+CONFIG_LOCALVERSION="-mosaico-v1.2"
+CONFIG_DEFAULT_HOSTNAME="esp-mosaico"
+# CONFIG_STMMAC_ETH is not set
+# CONFIG_I2C is not set
+# CONFIG_USB is not set
+# CONFIG_PHY_ESP32S31_USB is not set

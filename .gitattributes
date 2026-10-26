@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.patch text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.dts text eol=lf
+*.fragment text eol=lf

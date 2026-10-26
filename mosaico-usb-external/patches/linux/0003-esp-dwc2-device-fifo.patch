@@ -1,0 +1,29 @@
+--- a/drivers/usb/dwc2/params.c
++++ b/drivers/usb/dwc2/params.c
+@@ -317,6 +317,26 @@
+ 	p->i2c_enable = false;
+ 	p->ahbcfg = GAHBCFG_HBSTLEN_INCR16 << GAHBCFG_HBSTLEN_SHIFT;
+ 	p->power_down = DWC2_POWER_DOWN_PARAM_NONE;
++	if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL &&
++	    hsotg->hw_params.enable_dynamic_fifo) {
++		struct dwc2_hw_params *hw = &hsotg->hw_params;
++		int fifo;
++
++		dev_info(hsotg->dev, "ESP device FIFO: total=%u rx=%u ep0=%u in1=%u dynamic=%u desc_dma=%u\n",
++			 hw->total_fifo_size, hw->rx_fifo_size,
++			 hw->dev_nperio_tx_fifo_size, hw->g_tx_fifo_size[1],
++			 hw->enable_dynamic_fifo, hw->dma_desc_enable);
++		/* Reset FIFO partitions are not the limits of dynamic FIFOs. */
++		hw->rx_fifo_size = hw->total_fifo_size;
++		hw->dev_nperio_tx_fifo_size = hw->total_fifo_size;
++		p->g_rx_fifo_size = 256;
++		p->g_np_tx_fifo_size = 64;
++		for (fifo = 1; fifo <= dwc2_hsotg_tx_fifo_count(hsotg); fifo++) {
++			hw->g_tx_fifo_size[fifo] = hw->total_fifo_size;
++			p->g_tx_fifo_size[fifo] = fifo <= 2 ? 128 : 64;
++		}
++	}
++
+ }
+ 
+ const struct of_device_id dwc2_of_match_table[] = {

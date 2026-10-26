@@ -1,0 +1,27 @@
+--- a/arch/riscv/boot/dts/espressif/Makefile
++++ b/arch/riscv/boot/dts/espressif/Makefile
+@@ -2,3 +2,4 @@
+ 
+ dtb-$(CONFIG_ARCH_ESPRESSIF) += esp32s31.dtb
+ dtb-$(CONFIG_ARCH_ESPRESSIF) += esp32s31-mosaico-v1.2.dtb
++dtb-$(CONFIG_ARCH_ESPRESSIF) += esp32s31-mosaico-v1.2-usb.dtb
+--- /dev/null
++++ b/arch/riscv/boot/dts/espressif/esp32s31-mosaico-v1.2-usb.dts
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++#include "esp32s31.dts"
++
++/ {
++    model = "Espressif ESP-Mosaico V1.2 (USB NCM SSH)";
++    chosen {
++        stdout-path = "serial0:115200n8";
++        bootargs = "earlycon=sbi console=ttyS0 root=mtd:rootfs rootfstype=cramfs ro swiotlb=128 g_ncm.dev_addr=02:29:04:d0:a4:18 g_ncm.host_addr=02:29:04:d0:a4:19 g_ncm.qmult=1 g_ncm.iSerialNumber=Mosaico1c2904d0a418";
++    };
++};
++&emac { status = "disabled"; };
++&i2c0 { status = "disabled"; };
++&usb {
++    status = "okay";
++    dr_mode = "peripheral";
++};
++&usb_phy { status = "okay"; };

@@ -1,0 +1,32 @@
+{
+  "buildroot": {
+    "url": "https://github.com/buildroot/buildroot.git",
+    "ref": "2025.02",
+    "commit": "aa2d7ca53f704af901f6c33c13e4bb1591886700"
+  },
+  "esp-buildroot-external": {
+    "url": "https://github.com/espressif/esp-buildroot-external.git",
+    "ref": "buildroot/v2025.02-esp32s31",
+    "commit": "fb8dca11dbf213db1648c25145c28673937f576c"
+  },
+  "linux": {
+    "url": "https://github.com/espressif/linux.git",
+    "ref": "integration/v6.18-esp32s31",
+    "commit": "dc0e3821e39bd7c169cefd274691e1998a844028"
+  },
+  "u-boot": {
+    "url": "https://github.com/espressif/u-boot.git",
+    "ref": "integration/v2024.07-esp32s31",
+    "commit": "b2ec9ae21622f92d35462f5ae3bf053466998cc6"
+  },
+  "opensbi": {
+    "url": "https://github.com/espressif/opensbi.git",
+    "ref": "integration/v1.6-esp32s31",
+    "commit": "5395e03e1cb295257142cfdeaade6334f1543bcb"
+  },
+  "esp-linux-bsp": {
+    "url": "https://github.com/espressif/esp-linux-bsp.git",
+    "ref": "integration/v1.0-esp32s31",
+    "commit": "22455bf67ccc1aace91a547557af43fd85192281"
+  }
+}

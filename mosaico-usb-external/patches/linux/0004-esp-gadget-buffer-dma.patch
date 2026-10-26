@@ -1,0 +1,10 @@
+--- a/drivers/usb/dwc2/params.c
++++ b/drivers/usb/dwc2/params.c
+@@ -329,6 +329,7 @@
+ 		/* Reset FIFO partitions are not the limits of dynamic FIFOs. */
+ 		hw->rx_fifo_size = hw->total_fifo_size;
+ 		hw->dev_nperio_tx_fifo_size = hw->total_fifo_size;
++		p->g_dma_desc = false;
+ 		p->g_rx_fifo_size = 256;
+ 		p->g_np_tx_fifo_size = 64;
+ 		for (fifo = 1; fifo <= dwc2_hsotg_tx_fifo_count(hsotg); fifo++) {

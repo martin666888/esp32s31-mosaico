@@ -1,0 +1,17 @@
+#!/bin/sh
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+n=0
+while [ ! -e /sys/class/net/usb0 ] && [ "$n" -lt 10 ]; do
+    sleep 1
+    n=$((n + 1))
+done
+if [ ! -e /sys/class/net/usb0 ]; then
+    echo "USB NCM interface unavailable; use UART console"
+    exit 0
+fi
+ifconfig lo 127.0.0.1 up
+ifconfig usb0 192.168.7.2 netmask 255.255.255.252 up || exit 1
+touch /run/udhcpd.leases
+udhcpd /etc/udhcpd.conf
+/usr/sbin/dropbear -s -r /etc/ssh/mosaico-host-ed25519 -p 192.168.7.2:22 -P /run/dropbear.pid
+echo "USB SSH: root@192.168.7.2 (authorized key required)"

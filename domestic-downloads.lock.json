@@ -1,0 +1,317 @@
+{
+  "acl-2.3.2.tar.xz": {
+    "file": "/userdata/esp32s31/dl/acl/acl-2.3.2.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "97203a72cae99ab89a067fe2210c1cbf052bc492b479eca7d226d9830883b0bd"
+  },
+  "busybox-1.37.0.tar.bz2": {
+    "file": "/userdata/esp32s31/dl/busybox/busybox-1.37.0.tar.bz2",
+    "origin": "existing-cache",
+    "sha256": "3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4"
+  },
+  "attr-2.5.2.tar.xz": {
+    "file": "/userdata/esp32s31/dl/attr/attr-2.5.2.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "f2e97b0ab7ce293681ab701915766190d607a1dba7fae8a718138150b700a70b"
+  },
+  "autoconf-archive-2023.02.20.tar.xz": {
+    "file": "/userdata/esp32s31/dl/autoconf-archive/autoconf-archive-2023.02.20.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "71d4048479ae28f1f5794619c3d72df9c01df49b1c628ef85fde37596dc31a33"
+  },
+  "autoconf-2.72.tar.xz": {
+    "file": "/userdata/esp32s31/dl/autoconf/autoconf-2.72.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "ba885c1319578d6c94d46e9b0dceb4014caafe2490e437a0dbca3f270a223f5a"
+  },
+  "automake-1.16.5.tar.xz": {
+    "file": "/userdata/esp32s31/dl/automake/automake-1.16.5.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "f01d58cd6d9d77fbdca9eb4bbd5ead1988228fdb73d6f7a201f5f8d6b118b469"
+  },
+  "cramfs-2.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/cramfs/cramfs-2.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "cdb7a4ecad034f063b6456b37cdf653ae31758a224c32161e54712a9d7f01cc3"
+  },
+  "esp-linux-bsp-22455bf67ccc1aace91a547557af43fd85192281.tar.gz": {
+    "file": "/userdata/esp32s31/dl/esp-linux-bsp/esp-linux-bsp-22455bf67ccc1aace91a547557af43fd85192281.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "a9e563353e46c86f6311410a181ec39d5244c7f2ebba1c72b12440cc606a4b32"
+  },
+  "fakeroot_1.36.orig.tar.gz": {
+    "file": "/userdata/esp32s31/dl/fakeroot/fakeroot_1.36.orig.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "7fe3cf3daf95ee93b47e568e85f4d341a1f9ae91766b4f9a9cdc29737dea4988"
+  },
+  "expat-2.7.0.tar.xz": {
+    "file": "/userdata/esp32s31/dl/expat/expat-2.7.0.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "25df13dd2819e85fb27a1ce0431772b7047d72af81ae78dc26b4c6e0805f48d1"
+  },
+  "flex-2.6.4.tar.gz": {
+    "file": "/userdata/esp32s31/dl/flex/flex-2.6.4.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995"
+  },
+  "bison-3.8.2.tar.xz": {
+    "file": "/userdata/esp32s31/dl/bison/bison-3.8.2.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "9bba0214ccf7f1079c5d59210045227bcf619519840ebfa80cd3849cff5a5bf2"
+  },
+  "gettext-tiny-0.3.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/gettext-tiny/gettext-tiny-0.3.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "29cc165e27e83d2bb3760118c2368eadab550830d962d758e51bd36eb860f383"
+  },
+  "kmod-33.tar.xz": {
+    "file": "/userdata/esp32s31/dl/kmod/kmod-33.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "dc768b3155172091f56dc69430b5481f2d76ecd9ccb54ead8c2540dbcf5ea9bc"
+  },
+  "libtool-2.4.6.tar.xz": {
+    "file": "/userdata/esp32s31/dl/libtool/libtool-2.4.6.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "7c87a8c2c8c0fc9cd5019e402bed4292462d00a718a7cd5f11218153bf28b26f"
+  },
+  "libffi-3.4.6.tar.gz": {
+    "file": "/userdata/esp32s31/dl/libffi/libffi-3.4.6.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "b0dea9df23c863a7a50e825440f3ebffabd65df1497108e5d437747843895a4e"
+  },
+  "yaml-0.2.5.tar.gz": {
+    "file": "/userdata/esp32s31/dl/libyaml/yaml-0.2.5.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "c642ae9b75fee120b2d96c712538bd2cf283228d2337df2cf2988e3c02678ef4"
+  },
+  "zlib-1.3.1.tar.xz": {
+    "file": "/userdata/esp32s31/dl/libzlib/zlib-1.3.1.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "38ef96b8dfe510d42707d9c781877914792541133e1870841463bfa73f883e32"
+  },
+  "patchelf-0.13.tar.bz2": {
+    "file": "/userdata/esp32s31/dl/patchelf/patchelf-0.13.tar.bz2",
+    "origin": "existing-cache",
+    "sha256": "4c7ed4bcfc1a114d6286e4a0d3c1a90db147a4c3adda1814ee0eee0f9ee917ed"
+  },
+  "m4-1.4.19.tar.xz": {
+    "file": "/userdata/esp32s31/dl/m4/m4-1.4.19.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "63aede5c6d33b6d9b13511cd0be2cac046f2e70fd0a07aa9573a04a82783af96"
+  },
+  "pkgconf-2.3.0.tar.xz": {
+    "file": "/userdata/esp32s31/dl/pkgconf/pkgconf-2.3.0.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "3a9080ac51d03615e7c1910a0a2a8df08424892b5f13b0628a204d3fcce0ea8b"
+  },
+  "pcre2-10.44.tar.bz2": {
+    "file": "/userdata/esp32s31/dl/pcre2/pcre2-10.44.tar.bz2",
+    "origin": "existing-cache",
+    "sha256": "d34f02e113cf7193a1ebf2770d3ac527088d485d4e047ed10e5d217c6ef5de96"
+  },
+  "calver-2022.6.26.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-calver/calver-2022.6.26.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "e05493a3b17517ef1748fbe610da11f10485faa7c416b9d33fd4a52d74894f8b"
+  },
+  "attrs-25.1.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-attrs/attrs-25.1.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "1c97078a80c814273a76b2a298a932eb681c87415c11dee0a6921de7f1b02c3e"
+  },
+  "flit_core-3.10.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-flit-core/flit_core-3.10.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "66e5b87874a0d6e39691f0e22f09306736b633548670ad3c09ec9db03c5662f7"
+  },
+  "hatch_fancy_pypi_readme-24.1.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-hatch-fancy-pypi-readme/hatch_fancy_pypi_readme-24.1.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "44dd239f1a779b9dcf8ebc9401a611fd7f7e3e14578dcf22c265dfaf7c1514b8"
+  },
+  "hatch_vcs-0.4.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-hatch-vcs/hatch_vcs-0.4.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "093810748fe01db0d451fabcf2c1ac2688caefd232d4ede967090b1c1b07d9f7"
+  },
+  "hatchling-1.27.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-hatchling/hatchling-1.27.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "971c296d9819abb3811112fc52c7a9751c8d381898f36533bb16f9791e941fd6"
+  },
+  "installer-0.7.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-installer/installer-0.7.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "a26d3e3116289bb08216e0d0f7d925fcef0b0194eedfa0c944bcaaa106c4b631"
+  },
+  "jsonschema-4.23.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-jsonschema/jsonschema-4.23.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "d71497fef26351a33265337fa77ffeb82423f3ea21283cd9467bb03999266bc4"
+  },
+  "jsonschema_specifications-2024.10.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-jsonschema-specifications/jsonschema_specifications-2024.10.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "0f38b83639958ce1152d02a7f062902c41c8fd20d558b0c34344292d417ae272"
+  },
+  "cython-3.0.11.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-cython/cython-3.0.11.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "7146dd2af8682b4ca61331851e6aebce9fe5158e75300343f80c07ca80b1faff"
+  },
+  "packaging-24.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-packaging/packaging-24.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "c228a6dc5e932d346bc5739379109d49e8853dd8223571c7c5b55260edc0b97f"
+  },
+  "pathspec-0.12.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-pathspec/pathspec-0.12.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712"
+  },
+  "gettext-0.22.4.tar.xz": {
+    "file": "/userdata/esp32s31/dl/gettext-tiny/gettext-0.22.4.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "29217f1816ee2e777fa9a01f9956a14139c0c23cc1b20368f06b2888e8a34116"
+  },
+  "pluggy-1.5.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-pluggy/pluggy-1.5.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "2cffa88e94fdc978c4c574f15f9e59b7f4201d439195c3715ca9e2486f1d0cf1"
+  },
+  "pylibfdt-1.7.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-pylibfdt/pylibfdt-1.7.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "b18c6c40400ed4374d0a142dcdb07e5402574ff1304454019a1fd92735b54756"
+  },
+  "build-1.2.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-pypa-build/build-1.2.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "119b2fb462adef986483438377a13b2f42064a2a3a4161f24a0cca698a07ac8c"
+  },
+  "pyproject_hooks-1.2.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-pyproject-hooks/pyproject_hooks-1.2.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "1e859bd5c40fae9448642dd871adf459e5e2084186e8d2c2a79a824c970da1f8"
+  },
+  "pyyaml-6.0.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-pyyaml/pyyaml-6.0.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e"
+  },
+  "referencing-0.36.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-referencing/referencing-0.36.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "df2e89862cd09deabbdba16944cc3f10feb6b3e6f18e902f7cc25609a34775aa"
+  },
+  "python-rpds-py-0.22.3-cargo2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-rpds-py/python-rpds-py-0.22.3-cargo2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "e8422d1a1734de76d460e944b2b760785c88948d1f85640930d3fcf66b553fbe"
+  },
+  "semantic_version-2.10.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-semantic-version/semantic_version-2.10.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "bdabb6d336998cbb378d4b9db3a4b56a1e3235701dc05ea2690d9a997ed5041c"
+  },
+  "setuptools-75.8.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-setuptools/setuptools-75.8.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "c5afc8f407c626b8313a86e10311dd3f661c6cd9c09d4bf8c15c0e11f9f2b0e6"
+  },
+  "setuptools_rust-1.10.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-setuptools-rust/setuptools_rust-1.10.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "5d73e7eee5f87a6417285b617c97088a7c20d1a70fcea60e3bdc94ff567c29dc"
+  },
+  "setuptools_scm-8.1.0.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-setuptools-scm/setuptools_scm-8.1.0.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "42dea1b65771cba93b7a515d65a65d8246e560768a66b9106a592c8e7f26c8a7"
+  },
+  "tomli-2.2.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-tomli/tomli-2.2.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "cd45e1dc79c835ce60f7404ec8119f2eb06d38b1deba146f07ced3bbc44505ff"
+  },
+  "trove_classifiers-2025.1.15.22.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-trove-classifiers/trove_classifiers-2025.1.15.22.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "90af74358d3a01b3532bc7b3c88d8c6a094c2fd50a563d13d9576179326d7ed9"
+  },
+  "typing_extensions-4.12.2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-typing-extensions/typing_extensions-4.12.2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"
+  },
+  "wheel-0.45.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-wheel/wheel-0.45.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "661e1abd9198507b1409a20c02106d9670b2576e916d58f520316666abca6729"
+  },
+  "yamllint-1.35.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-yamllint/yamllint-1.35.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "7a003809f88324fd2c877734f2d575ee7881dd9043360657cc8049c809eba6cd"
+  },
+  "python-maturin-1.8.1-cargo2.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-maturin/python-maturin-1.8.1-cargo2.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "da4ab5a84c35d0ab00c0fb63975f25c497d6570dcdeaae0ec0f7d9f70f1d5382"
+  },
+  "pyelftools-0.31.tar.gz": {
+    "file": "/userdata/esp32s31/dl/python-pyelftools/pyelftools-0.31.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "c774416b10310156879443b81187d182d8d9ee499660380e645918b50bc88f99"
+  },
+  "swig-4.1.1.tar.gz": {
+    "file": "/userdata/esp32s31/dl/swig/swig-4.1.1.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "2af08aced8fcd65cdb5cc62426768914bedc735b1c250325203716f78e39ac9b"
+  },
+  "zstd-1.5.7.tar.gz": {
+    "file": "/userdata/esp32s31/dl/zstd/zstd-1.5.7.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+  },
+  "binutils-2.43.1.tar.xz": {
+    "file": "/userdata/esp32s31/dl/binutils/binutils-2.43.1.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "13f74202a3c4c51118b797a39ea4200d3f6cfbe224da6d1d95bb938480132dfd"
+  },
+  "queue.h": {
+    "file": "/userdata/esp32s31/dl/musl-compat-headers/queue.h",
+    "origin": "existing-cache",
+    "sha256": "c13407edd0e33be73cae72514cb234f8612e1c0e54401c9448daffd3a240158b"
+  },
+  "opensbi-5395e03e1cb295257142cfdeaade6334f1543bcb.tar.gz": {
+    "file": "/userdata/esp32s31/dl/opensbi/opensbi-5395e03e1cb295257142cfdeaade6334f1543bcb.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "050b488c6fed74f20ebf3cd6fc17a57242aa733cedcbf5cfcc937c922873021f"
+  },
+  "riscv64-esp-linux-musl-14.1.1_20260922-aarch64-linux-gnu.tar.xz": {
+    "file": "/userdata/esp32s31/dl/toolchain-external-custom/riscv64-esp-linux-musl-14.1.1_20260922-aarch64-linux-gnu.tar.xz",
+    "origin": "existing-cache",
+    "sha256": "ebd357be7781b4fc54ba450141166024d21da78fcd1d4606a8fa42201cd60379"
+  },
+  "u-boot-b2ec9ae21622f92d35462f5ae3bf053466998cc6-reconstructed.tar.gz": {
+    "file": "/userdata/esp32s31/dl/uboot/u-boot-b2ec9ae21622f92d35462f5ae3bf053466998cc6-reconstructed.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "738d44878439c88994bfc81f279e029e48ca56553b9473cec37cd643619daffb"
+  },
+  "linux-dc0e3821e39bd7c169cefd274691e1998a844028-reconstructed.tar.gz": {
+    "file": "/userdata/esp32s31/dl/linux/linux-dc0e3821e39bd7c169cefd274691e1998a844028-reconstructed.tar.gz",
+    "origin": "existing-cache",
+    "sha256": "37c98ed966e9b052cf6529fd5c2e06680cc4ce956f132b064ccf5bd3af74746a"
+  },
+  "Python-3.12.9.tar.xz": {
+    "file": "/userdata/esp32s31/dl/python3/Python-3.12.9.tar.xz",
+    "origin": "https://mirrors.huaweicloud.com/python/3.12.9/Python-3.12.9.tar.xz",
+    "sha256": "7220835d9f90b37c006e9842a8dff4580aaca4318674f947302b8d28f3f81112"
+  },
+  "rust-1.82.0-aarch64-unknown-linux-gnu.tar.xz": {
+    "file": "/userdata/esp32s31/dl/rust-bin/rust-1.82.0-aarch64-unknown-linux-gnu.tar.xz",
+    "origin": "https://mirrors.huaweicloud.com/rustup/dist/rust-1.82.0-aarch64-unknown-linux-gnu.tar.xz",
+    "sha256": "99acf175be33bd96ac82d644125d0e2acc6962d61ee64851edc7d8ba3bd23ca4"
+  }
+}
