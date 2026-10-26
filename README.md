@@ -2,7 +2,7 @@
 
 本仓库管理 Mosaico 的板级配置、内核补丁、构建辅助脚本和阶段说明。RK3588 是构建与调试主机，ESP32-S31 是 Linux 运行目标。工程当前路径为 `/userdata/esp32s31`。
 
-**接续开发前先读 [当前状态](docs/PROJECT-STATUS.md)。** 第一笔提交是 2026-10-26 接手时的现状快照，不代表此前工作在这一天完成，也不是过去开发历史的重建。
+**接续开发前先读 [当前状态](docs/PROJECT-STATUS.md)。** 源码修改现可直接用独立 Git 查看差异，见 [Linux 源码 Git](docs/LINUX-DEVELOPMENT.md)。 第一笔提交是 2026-10-26 接手时的现状快照，不代表此前工作在这一天完成，也不是过去开发历史的重建。
 
 ## 目录与职责
 
@@ -15,7 +15,8 @@
 | `official-patches/` | 重建官方源码版本的补丁及来源记录 | 是 |
 | `docs/` | 阶段、证据位置和学习记录 | 是 |
 | `sources/` | 官方源码基线，部分目录另有自己的 `.git` | 否，保持现状 |
-| `output-mosaico/` | Buildroot 构建树、主机工具链和镜像 | 否，可重新生成 |
+| `output-mosaico/` | Buildroot 构建树、主机工具链和镜像；其中 Linux 源码由独立 Git 跟踪 | 根仓库不跟踪，清理前保存源码工作 |
+| `.linux-dev-git/` | Linux 源码仓库历史，位于输出目录之外 | 根仓库不跟踪 |
 | `archives/`、`dl/`、`.venv/` | 源码归档、依赖缓存和 Python 环境 | 否 |
 | `checks/`、`logs/`、`tmp/` | 本机候选固件、测试证据、日志和临时文件 | 否 |
 | `private/`、`backups/`、外部树中的 SSH 身份文件 | 本机身份与恢复资料；固件也可能含设备私钥 | 否，单独保管 |
@@ -38,7 +39,7 @@ checks/usb-candidate-<摘要>/ + checks/usb-flash-plan.json
 ESP-Mosaico V1.2
 ```
 
-`sources/linux` 当前用于官方基线对照，不在这里直接开发本地驱动。构建树可以用于快速编译试验，但 `linux-dirclean` 会删除它。需要保留的改动必须生成补丁并检查能否从基线重新构建。
+`sources/linux` 当前用于官方基线对照，不在这里直接开发本地驱动。构建树已配置独立源码 Git，可以直接查看驱动修改；历史位于 `.linux-dev-git/`，但 `linux-dirclean` 仍会删除未提交的工作区内容，清理前按 [源码 Git 说明](docs/LINUX-DEVELOPMENT.md) 备份。需要保留的改动必须生成补丁并检查能否从基线重新构建。
 
 两套变体共用 `output-mosaico`，构建脚本主要复用现有配置；脚本名称不会自动切换完整配置。运行 `configure-mosaico.sh` 会重新生成 UART 配置和设备树原料，先检查差异，不要把它当作无副作用的通用构建命令。
 

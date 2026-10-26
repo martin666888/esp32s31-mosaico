@@ -65,3 +65,12 @@
 - `sources/opensbi`、`sources/esp-linux-bsp` 没有 `.git`。
 
 引入根仓库时不改写这些目录，不伪造此前开发历史。首笔提交仅保存可复现定制输入及此处记录的接手状态。
+
+## 2026-10-26 补充 Linux 源码 Git
+
+- Linux 工作目录：`/userdata/esp32s31/output-mosaico/build/linux-custom`；分支 `codex/linux-learning`。
+- Git 历史独立存放在 `/userdata/esp32s31/.linux-dev-git`，不纳入根仓库，不依赖原始源码仓库的对象文件。
+- 从现有官方源码快照和六个现有补丁重建七笔基线提交，不冒充前任真实提交历史。标签 `baseline/espressif-linux`、`baseline/spi-stage1` 便于对照。
+- 设置时用户驱动新增的六行注释保持原样，显示为未提交修改；共跟踪 91,194 个源码路径，编译产物被忽略。
+- 新增 `scripts/linux-dev-git.py`，支持 status、backup 和 attach，详见 [源码 Git 使用说明](LINUX-DEVELOPMENT.md)。输出清理仍会删除未提交代码；清理前备份。
+- 本次只设置版本管理，没有修改驱动逻辑、重新构建、推送或刷写。
