@@ -13,7 +13,7 @@ Linux 仓库分支：codex/linux-learning。Git 数据实际保存在 /userdata/
 
 初始化时从现有 sources/linux 暂存的官方基线复制 Git 对象及索引，再只在新仓库索引中依次应用 0001～0006。产生的是今天重建的基线快照及六笔补丁提交，不是找回了前任真实开发历史，也不是原始官方 commit。设置过程没有把源码切换回旧版本，没有修改用户代码。
 
-标签 baseline/espressif-linux 对应现有官方源码快照，baseline/spi-stage1 对应应用六个补丁后的基线。用户已写的六行注释保留为未提交改动。
+标签 baseline/espressif-linux 对应现有官方源码快照，baseline/spi-stage1 对应应用原有六个补丁后的历史基线，不表示最新硬件初始化完成点。初始化 Git 时保留了用户当时的注释；当前第一阶段源码及学习注释已提交为 37b5e36b3，对应的新增构建补丁为 0007、0008。
 
 ## 查看当前修改
 
@@ -52,7 +52,7 @@ Git 历史在构建目录之外，linux-dirclean 不会删除这些历史。但�
 
 执行 linux-dirclean、make clean 或删除输出目录之前，先备份并保存所需版本，确认源码改动已整理到补丁。不要用 git clean 清理当前混合源码与构建产物目录。
 
-重建完成、六个补丁已应用后，可重新连接现有 Git 历史：
+重建完成、当前八个补丁已应用且源码内容核对一致后，可重新连接现有 Git 历史：
 
 ```sh
 python3 /userdata/esp32s31/scripts/linux-dev-git.py attach

@@ -1,0 +1,89 @@
+From c50958427362732d43bacb9455a10a962347afa6 Mon Sep 17 00:00:00 2001
+From: "martin.ma" <hunyuma5@gmail.com>
+Date: Fri, 30 Oct 2026 21:05:55 +0800
+Subject: [PATCH] spi: esp32s31: add GPSPI2 device tree and MMIO mapping
+
+---
+ .../espressif/esp32s31-mosaico-v1.2-usb.dts    |  3 +++
+ arch/riscv/boot/dts/espressif/esp32s31.dts     |  8 ++++++++
+ drivers/spi/spi-esp32s31.c                     | 18 ++++++++++++++++++
+ 3 files changed, 29 insertions(+)
+
+diff --git a/arch/riscv/boot/dts/espressif/esp32s31-mosaico-v1.2-usb.dts b/arch/riscv/boot/dts/espressif/esp32s31-mosaico-v1.2-usb.dts
+index 60586d40f..395db752a 100644
+--- a/arch/riscv/boot/dts/espressif/esp32s31-mosaico-v1.2-usb.dts
++++ b/arch/riscv/boot/dts/espressif/esp32s31-mosaico-v1.2-usb.dts
+@@ -15,3 +15,6 @@ &usb {
+     dr_mode = "peripheral";
+ };
+ &usb_phy { status = "okay"; };
++&spi2 {
++    status = "okay";
++};
+diff --git a/arch/riscv/boot/dts/espressif/esp32s31.dts b/arch/riscv/boot/dts/espressif/esp32s31.dts
+index c0b39b790..327657118 100644
+--- a/arch/riscv/boot/dts/espressif/esp32s31.dts
++++ b/arch/riscv/boot/dts/espressif/esp32s31.dts
+@@ -271,6 +271,14 @@ i2c0: i2c@20385000 {
+ 			clock-frequency = <100000>;
+ 		};
+ 
++		spi2: spi@2038f000{
++			compatible = "esp,esp32s31-spi2";
++			reg = <0x2038f000 0x1000>;
++    		#address-cells = <1>;
++    		#size-cells = <0>;
++    		status = "disabled";
++		};
++
+ 		/*
+ 		 * Synopsys DWMAC-3.70a, driven by stmmac through the
+ 		 * dwmac-esp32s31 glue.
+diff --git a/drivers/spi/spi-esp32s31.c b/drivers/spi/spi-esp32s31.c
+index 6a5e3ff47..c83b4e6ac 100644
+--- a/drivers/spi/spi-esp32s31.c
++++ b/drivers/spi/spi-esp32s31.c
+@@ -12,11 +12,21 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/err.h>
++#include <linux/io.h>
+ 
+ static int esp32s31_spi_probe(struct platform_device *pdev)
+ {
+ 	dev_info(&pdev->dev, "matched, hardware support not implemented yet\n");
+ 
++	void __iomem *base;
++
++	base = devm_platform_ioremap_resource(pdev, 0);
++	if(IS_ERR(base))
++		return PTR_ERR(base);
++
++	dev_info(&pdev->dev,"register window mapped\n");
++
+ 	return 0;
+ }
+ 
+@@ -26,13 +36,21 @@ static const struct of_device_id esp32s31_spi_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, esp32s31_spi_of_match);
+ 
++// 定义一个驱动变量，类型是内核已有的 struct platform_driver
++// 这个类型用于描述芯片内部固定硬件的驱动；真正的注册在最后
+ static struct platform_driver esp32s31_spi_driver = {
++	// 设备配对成功后，内核调用 probe，并通过 pdev 传入设备数据
+ 	.probe = esp32s31_spi_probe,
+ 	.driver = {
++		// 驱动的显示名，主要用于 /sys 和调试，不是当前的配对依据
+ 		.name = "esp32s31-spi",
++		// 指定本驱动使用的匹配表，就是上面那个数组esp32s31_spi_of_match[]；
++		// 表中列出能够匹配的设备 compatible
+ 		.of_match_table = esp32s31_spi_of_match,
+ 	},
+ };
++
++// 把上面的驱动变量登记进驱动名单
+ module_platform_driver(esp32s31_spi_driver);
+ 
+ MODULE_DESCRIPTION("Espressif ESP32-S31 GPSPI2 controller driver");

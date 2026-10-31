@@ -32,7 +32,7 @@
 | 目录或文件 | 用途 | 根仓库是否跟踪 |
 | --- | --- | --- |
 | `mosaico-external/` | UART 启动变体的配置与补丁 | 是，密钥除外 |
-| `mosaico-usb-external/` | 当前 USB NCM / SSH 变体；已保存补丁目前仅覆盖 SPI 骨架 | 是，密钥除外 |
+| `mosaico-usb-external/` | 当前 USB NCM / SSH 变体；补丁 0001～0008 已覆盖 GPSPI2 第一阶段初始化 | 是，密钥除外 |
 | `scripts/` | 配置、构建、候选生成、烧录与验证辅助脚本 | 是；脚本入库不代表授权运行烧录 |
 | `sources.lock.json`、`archives.lock.json` 等锁文件 | 固定上游版本、下载位置和摘要 | 是 |
 | `official-patches/` | 重建官方源码版本的补丁及来源记录 | 是 |
@@ -99,7 +99,7 @@ git show --stat HEAD
 
 硬件依据的阅读顺序：官方 ESP-IDF SPI LL 动作 → 对应寄存器头文件的偏移/位域 → Linux provider 的实现 → SPI 消费者的调用。GPSPI2 时钟/复位控制位在 HP_SYS_CLKRST 的 `0x06c` 偏移，不能套用 I2C 位布局，也不能加到 SPI 自身 MMIO 基址上。
 
-加注释前的六个文件和已有源码差异保存在 `/userdata/esp32s31/backups/stage1-comments-20261031-120844-265128/`。六文件的最新逻辑和注释已保存为源码提交 `37b5e36b3`，尚未导出为 external 构建补丁。
+加注释前的六个文件和已有源码差异保存在 `/userdata/esp32s31/backups/stage1-comments-20261031-120844-265128/`。六文件的最新逻辑和注释已保存为源码提交 `37b5e36b3`，并导出为 external 构建补丁 `0008`；前置的设备树和 MMIO 映射提交 `c50958427` 已导出为 `0007`。
 
 ## 构建与下一步验收
 
@@ -140,6 +140,13 @@ git diff --check
 git diff
 ```
 
-检查后由用户选择文件暂存和提交。源码提交不会自动更新 `mosaico-usb-external/patches/linux/`；当前仍只有 `0001`～`0006`，后续需把设备树与最新驱动改动整理成按顺序可应用的补丁，并核对外部树中的 DTS 原料。
+源码提交不会自动更新构建补丁。本阶段已将两个源码提交导出到 `/userdata/esp32s31/mosaico-usb-external/patches/linux/`：
+
+- `0007-esp32s31-gpspi2-dt-mmio.patch`：设备树节点、板级启用及 MMIO 映射。
+- `0008-esp32s31-gpspi2-hardware-init.patch`：时钟/复位资源、初始化实现及学习注释。
+
+已在独立 Git 索引中从 `baseline/espressif-linux` 顺序应用 `0001`～`0008`，所得完整源码树与 `37b5e36b3` 完全一致；另用 Buildroot 自身的 `support/scripts/apply-patches.sh` 在临时目录应用八份补丁，13 个涉及文件与当前源码逐字节一致，无 fuzz 或 offset。USB 板级 DTS 原料已同步，UART 原料原本一致。验证证据位于 `/userdata/esp32s31/checks/stage1-patch-export-6hwzcmmm/`。
+
+本次验证了补丁链和源码一致性，没有重新编译整套系统或烧录。现有工作树和固件保持原状。后续新增实现仍需重新导出对应补丁。
 
 执行 `linux-dirclean` 或从基线重新解包之前，必须完成所需版本保存和补丁整理。否则即便源码 Git 历史仍在，Buildroot 也不会自动把最新实现重新加入固件。

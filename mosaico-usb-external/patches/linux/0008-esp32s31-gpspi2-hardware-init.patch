@@ -1,0 +1,684 @@
+From 37b5e36b3f188d0d2e3b7aa8e1c07a78b5fe956b Mon Sep 17 00:00:00 2001
+From: "martin.ma" <hunyuma5@gmail.com>
+Date: Sat, 31 Oct 2026 22:54:28 +0800
+Subject: [PATCH] spi: esp32s31: complete stage-one clock and reset
+ initialization
+
+Add GPSPI2 BUS/CORE clock IDs and provider operations, reset control and
+DT resource references. Initialize clocks/reset in probe, check the
+20 MHz calculated core rate, read CMD and unwind hardware resources.
+Preserve Chinese learning comments explaining stage-one implementation.
+
+Validation: user completed linux-rebuild and supplied board boot output:
+esp32s31-spi 2038f000.spi: hardware init ready: core=20000000 Hz, CMD=0x00000000
+User also reached the board shell over USB-network SSH.
+This validates the initialization path, not SPI transfers or pin waveforms.
+---
+ arch/riscv/boot/dts/espressif/esp32s31.dts |  23 ++
+ drivers/clk/clk-esp32s31.c                 | 194 ++++++++++++++-
+ drivers/reset/reset-esp32s31.c             |  18 ++
+ drivers/spi/spi-esp32s31.c                 | 265 ++++++++++++++++++++-
+ include/dt-bindings/clock/esp32s31.h       |  18 +-
+ include/dt-bindings/reset/esp32s31.h       |  12 +-
+ 6 files changed, 516 insertions(+), 14 deletions(-)
+
+diff --git a/arch/riscv/boot/dts/espressif/esp32s31.dts b/arch/riscv/boot/dts/espressif/esp32s31.dts
+index 327657118..de1424502 100644
+--- a/arch/riscv/boot/dts/espressif/esp32s31.dts
++++ b/arch/riscv/boot/dts/espressif/esp32s31.dts
+@@ -271,11 +271,34 @@ i2c0: i2c@20385000 {
+ 			clock-frequency = <100000>;
+ 		};
+ 
++		/*
++		 * 阶段一：把 GPSPI2 设备与新增的时钟/复位 provider 资源关联起来。
++		 * reg 仍描述 SPI 自身窗口；时钟/复位控制寄存器位于另一个 syscon，
++		 * 由各自 provider 访问，不要把 0x06c 加到此处的 SPI 基址上。
++		 */
+ 		spi2: spi@2038f000{
+ 			compatible = "esp,esp32s31-spi2";
+ 			reg = <0x2038f000 0x1000>;
+     		#address-cells = <1>;
+     		#size-cells = <0>;
++			/*
++			 * 阶段一：clk phandle 指向时钟提供者，两个 ID 分别选择描述表的
++			 * BUS、CORE 项。逗号连接同一个属性的两个资源，最后才用分号结束。
++			 */
++			clocks = <&clk ESP_S31_CLK_GPSPI2_BUS>,
++				<&clk ESP_S31_CLK_GPSPI2_CORE>;
++			/*
++			 * 阶段一：名字与上面资源逐项对应；驱动 devm_clk_get(dev, "bus")
++			 * 和 "core" 按这些名字查找。标准属性名是复数 clock-names。
++			 */
++			clock-names = "bus","core";
++			/*
++			 * 阶段一：rst phandle 与 ID 5 选择复位描述表中的 GPSPI2 项。
++			 * 下面的名字 spi 对应 devm_reset_control_get_exclusive(dev, "spi")。
++			 * SoC 节点仍默认 disabled，由 Mosaico USB 板级 DTS 的 &spi2 启用。
++			 */
++			resets = <&rst ESP_S31_RST_GPSPI2>;
++			reset-names = "spi";
+     		status = "disabled";
+ 		};
+ 
+diff --git a/drivers/clk/clk-esp32s31.c b/drivers/clk/clk-esp32s31.c
+index 709c8595e..c43dfe840 100644
+--- a/drivers/clk/clk-esp32s31.c
++++ b/drivers/clk/clk-esp32s31.c
+@@ -72,6 +72,57 @@
+ 
+ #define ESP32S31_CLK_MAX_PARENTS	2
+ 
++/*
++ * 阶段一：新增 GPSPI2 时钟控制；修改的是共享 HP_SYS_CLKRST 窗口，
++ * 不是 SPI 驱动映射的 0x2038f000 窗口。0x06c 相对于 syscon 基址。
++ * 依据 ESP-IDF esp32s31/register/soc/hp_sys_clkrst_reg.h 的
++ * HP_SYS_CLKRST_GPSPI2_CTRL0_REG；spi_ll.h 给出开时钟及选源动作。
++ * 这些是官方源码依据，不能用相邻 I2C 寄存器的位布局来类推。
++ */
++/* GPSPI2 control register in HP_SYS_CLKRST */
++#define ESP32S31_HP_CLKRST_GPSPI2_CTRL0	0x06c
++
++/*
++ * 阶段一：GPSPI2 系统时钟门控；1 为开启，0 为关闭。
++ */
++#define ESP32S31_GPSPI2_SYS_CLK_EN	BIT(0)
++/*
++ * 阶段一：APB 寄存器接口时钟门控；与 SYS 门控一起组成 BUS 资源。
++ */
++#define ESP32S31_GPSPI2_APB_CLK_EN	BIT(1)
++/*
++ * 阶段一：两位时钟源选择字段；本阶段写 0，选择设备树已有的 XTAL。
++ */
++#define ESP32S31_GPSPI2_CLK_SRC_SEL	GENMASK(5, 4)
++/*
++ * 阶段一：HS 工作时钟门控；不等同于总线访问门控。
++ */
++#define ESP32S31_GPSPI2_HS_CLK_EN		BIT(6)
++/*
++ * 阶段一：第一级 HS 预分频字段，实际除数为字段值加 1。
++ */
++#define ESP32S31_GPSPI2_HS_CLK_DIV	GENMASK(14, 7)
++/*
++ * 阶段一：第二级 MST 预分频字段，接在 HS 后，实际除数同样加 1。
++ */
++#define ESP32S31_GPSPI2_MST_CLK_DIV	GENMASK(22, 15)
++/*
++ * 阶段一：MST 工作时钟门控；与 HS 门控一起组成 CORE 资源。
++ */
++#define ESP32S31_GPSPI2_MST_CLK_EN	BIT(23)
++
++/*
++ * 阶段一：把必须一起控制的 SYS/APB 两个位组合成一个掩码。
++ */
++#define ESP32S31_GPSPI2_BUS_GATES \
++	(ESP32S31_GPSPI2_SYS_CLK_EN | ESP32S31_GPSPI2_APB_CLK_EN)
++
++/*
++ * 阶段一：工作时钟开启时同时开启 HS/MST，关闭时也只清这两个门控位。
++ */
++#define ESP32S31_GPSPI2_CORE_GATES \
++	(ESP32S31_GPSPI2_HS_CLK_EN | ESP32S31_GPSPI2_MST_CLK_EN)
++
+ struct esp_clk_desc {
+ 	const char *name;
+ 	u8 map_idx;
+@@ -82,6 +133,11 @@ struct esp_clk_desc {
+ 	u32 mux;
+ 	const char * const *parents;
+ 	u8 num_parents;
++	/*
++	 * 阶段一：允许单个时钟覆盖通用操作；旧条目未填写时仍为 NULL。
++	 * GPSPI2 的 CORE 有两级预分频，不能直接套用 I2C 的一级分频回调。
++	 */
++	const struct clk_ops *ops;
+ };
+ 
+ static u32 esp_clk_field_get(u32 val, u32 mask)
+@@ -117,6 +173,103 @@ static void esp_clk_unprepare(struct clk_hw *hw)
+ 	regmap_update_bits(c->map, c->desc->reg, c->desc->gate, 0);
+ }
+ 
++
++/*
++ * Stage 1 policy:
++ * XTAL / 2 / 1 = 20 MHz, with a 40 MHz XTAL.
++ *
++ * Divider fields encode divisor minus one.
++ */
++/*
++ * 阶段一：消费者调用 clk_prepare_enable(core) 后，由 CCF 调到这里。
++ * 这时才真正配置硬件；仅注册描述表不会执行下面的寄存器写入。
++ * 当前策略固定为 40 MHz XTAL / HS 2 / MST 1 = 20 MHz；
++ * 它是控制器工作时钟，外部 SCK 还需后续 SPI CLOCK 寄存器分频。
++ */
++static int esp32s31_gpspi2_core_prepare(struct clk_hw *hw)
++{
++	struct esp_clk *c = to_esp_clk(hw);
++	u32 mask;
++	u32 value;
++
++	/*
++	 * 阶段一：只允许改选源、两级分频及 CORE 门控。
++	 * 排除 BUS 门控和 bit 2 复位位，避免覆盖其他资源当前的状态。
++	 */
++	mask = ESP32S31_GPSPI2_CLK_SRC_SEL |
++	       ESP32S31_GPSPI2_HS_CLK_DIV |
++	       ESP32S31_GPSPI2_MST_CLK_DIV |
++	       c->desc->gate;
++
++	/*
++	 * Source = XTAL: 0.
++	 * HS divisor = 2: field value 1.
++	 * MST divisor = 1: field value 0.
++	 */
++	/*
++	 * 阶段一：HS 字段写 1 表示除 2；其余被 mask 选中的选源和 MST
++	 * 字段在 value 中为 0，分别表示 XTAL、除 1；再把 CORE 门控置 1。
++	 */
++	value = esp_clk_field_prep(ESP32S31_GPSPI2_HS_CLK_DIV, 1) |
++		c->desc->gate;
++
++	/*
++	 * 阶段一：使用共享 syscon 的 regmap 做读改写，保留 mask 外的位。
++	 * 这样时钟和复位驱动能够分别修改同一寄存器中的不同字段。
++	 */
++	return regmap_update_bits(c->map, c->desc->reg, mask, value);
++}
++
++/*
++ * 阶段一：clk_get_rate(core) 的频率计算回调。
++ * 根据父时钟频率和实际寄存器字段计算，返回单位为 Hz。
++ * 这是寄存器配置对应的计算值，不是逻辑分析仪测到的引脚频率。
++ */
++static unsigned long
++esp32s31_gpspi2_core_recalc_rate(struct clk_hw *hw,
++			       unsigned long parent_rate)
++{
++	struct esp_clk *c = to_esp_clk(hw);
++	unsigned int value;
++	u32 hs_div;
++	u32 mst_div;
++
++	/*
++	 * 阶段一：读失败时返回 0，让消费者的频率检查发现异常。
++	 */
++	if (regmap_read(c->map, c->desc->reg, &value))
++		return 0;
++
++	/* This first implementation only models the XTAL source. */
++	/*
++	 * 阶段一：当前父时钟只建模 XTAL；若硬件仍选择其他来源，
++	 * 不使用 40 MHz 父频率强算结果，而是返回 0。
++	 */
++	if (value & ESP32S31_GPSPI2_CLK_SRC_SEL)
++		return 0;
++
++	/*
++	 * 阶段一：从两个字段还原实际除数，消除“寄存器值 = 除数 - 1”编码。
++	 */
++	hs_div = esp_clk_field_get(value, ESP32S31_GPSPI2_HS_CLK_DIV) + 1;
++	mst_div = esp_clk_field_get(value, ESP32S31_GPSPI2_MST_CLK_DIV) + 1;
++
++	/*
++	 * 阶段一：两级串联分频，所以必须连续除两次。
++	 */
++	return parent_rate / hs_div / mst_div;
++}
++
++/*
++ * 阶段一：把配置、关闭和频率计算三个动作交给 CCF。
++ * 关闭复用已有 esp_clk_unprepare，它只清 desc->gate，不改复位和分频。
++ */
++static const struct clk_ops esp32s31_gpspi2_core_ops = {
++	.prepare = esp32s31_gpspi2_core_prepare,
++	.unprepare = esp_clk_unprepare,
++	.recalc_rate = esp32s31_gpspi2_core_recalc_rate,
++};
++
+ /* The field holds div - 1, the encoding clk-divider calls the default one. */
+ static u8 esp_clk_div_width(const struct esp_clk_desc *d)
+ {
+@@ -231,6 +384,12 @@ static const char * const esp32s31_emac_ref_parents[] = { "mpll" };
+ static const char * const esp32s31_emac_ptp_parents[] = { "xtal" };
+ static const char * const esp32s31_usb_otghs_bus_parents[] = { "xtal" };
+ static const char * const esp32s31_usb_otghs_phyref_parents[] = { "xtal" };
++/*
++ * 阶段一：这里的 xtal 是时钟 provider 节点 clock-names 中的名字，
++ * 由 clk_parent_data.fw_name 解析到已有的 40 MHz fixed-clock。
++ * 它不是 SPI 消费者节点中 bus/core 的资源名。
++ */
++static const char * const esp32s31_gpspi2_core_parents[] = {"xtal"};
+ 
+ static const struct esp_clk_desc esp32s31_clk_descs[ESP_S31_CLK_NUM] = {
+ 	[ESP_S31_CLK_IOMUX_APB] = {
+@@ -318,10 +477,38 @@ static const struct esp_clk_desc esp32s31_clk_descs[ESP_S31_CLK_NUM] = {
+ 		.parents = esp32s31_emac_ptp_parents,
+ 		.num_parents = ARRAY_SIZE(esp32s31_emac_ptp_parents),
+ 	},
++	/*
++	 * 阶段一：头文件 ID 11 对应这个槽位；使用默认 map_idx=0，
++	 * 即父节点提供的 HP_SYS_CLKRST regmap。BUS 没有专用 ops，
++	 * 复用通用门控实现，仅管理访问所需的两个门控，不提供工作频率。
++	 */
++	[ESP_S31_CLK_GPSPI2_BUS] = {
++		.name = "gpspi2_bus",
++		.reg  = ESP32S31_HP_CLKRST_GPSPI2_CTRL0,
++		.gate = ESP32S31_GPSPI2_BUS_GATES,
++	},
++	/*
++	 * 阶段一：头文件 ID 12 对应这个槽位，和 BUS 共用控制寄存器，
++	 * 但使用独立门控掩码及专用回调；父时钟用于计算实际工作频率。
++	 */
++	[ESP_S31_CLK_GPSPI2_CORE] = {
++		.name = "gpspi2_core",
++		.reg = ESP32S31_HP_CLKRST_GPSPI2_CTRL0,
++		.gate = ESP32S31_GPSPI2_CORE_GATES,
++		.parents = esp32s31_gpspi2_core_parents,
++		.num_parents = ARRAY_SIZE(esp32s31_gpspi2_core_parents),
++		.ops = &esp32s31_gpspi2_core_ops,
++	},
+ };
+ 
+ static const struct clk_ops *esp_clk_pick_ops(const struct esp_clk_desc *d)
+ {
++	/*
++	 * 阶段一：优先选择显式指定的操作；未指定的旧时钟继续走原有分支，
++	 * 因此无需把 GPSPI2 的两级分频规则套到其他外设上。
++	 */
++	if (d->ops)
++		return d->ops;
+ 	if (d->mux)
+ 		return &esp_clk_ops_mux_gate_div;
+ 
+@@ -384,7 +571,12 @@ static int esp_clk_probe(struct platform_device *pdev)
+ 		init.ops = esp_clk_pick_ops(d);
+ 		init.parent_data = d->num_parents ? pdata : NULL;
+ 		init.num_parents = d->num_parents;
+-		if (d->div)
++		/*
++		 * 阶段一：CORE 的 prepare 会改选源和分频；禁止只返回之前缓存的
++		 * 频率，使 clk_get_rate 重新调用 recalc_rate 读取当前字段。
++		 * 旧有带分频字段的时钟仍保持原来的不缓存行为。
++		 */
++		if (d->div || d->ops)
+ 			init.flags = CLK_GET_RATE_NOCACHE;
+ 
+ 		c->hw.init = &init;
+diff --git a/drivers/reset/reset-esp32s31.c b/drivers/reset/reset-esp32s31.c
+index aa78ea1a6..fade45942 100644
+--- a/drivers/reset/reset-esp32s31.c
++++ b/drivers/reset/reset-esp32s31.c
+@@ -42,6 +42,15 @@
+ #define ESP32S31_RST_MAP_CNNT_SYS		1
+ #define ESP32S31_RST_NUM_MAPS			2
+ 
++/*
++ * 阶段一：GPSPI2 与时钟驱动共用 HP_SYS_CLKRST+0x06c。
++ * 依据官方 HP_SYS_CLKRST_GPSPI2_CTRL0_REG 及 REG_GPSPI2_RST_EN：
++ * bit 2 才是复位位，不能复用 I2C 的 bit 1。复位描述使用共享 regmap，
++ * 读改写时只动本资源的掩码，不覆盖选源、分频或其他门控。
++ */
++#define ESP32S31_HP_CLKRST_GPSPI2_CTRL0	0x06c
++#define ESP32S31_GPSPI2_RST_EN		BIT(2)
++
+ struct esp_s31_rst_desc {
+ 	u8 map_idx;
+ 	u32 reg;
+@@ -71,6 +80,15 @@ static const struct esp_s31_rst_desc esp_s31_rst_descs[ESP_S31_RST_NUM] = {
+ 		.reg = ESP32S31_CNNT_USB_OTG20_CTRL,
+ 		.mask = ESP32S31_USB_OTGHS_RST_EN,
+ 	},
++	/*
++	 * 阶段一：头文件 ID 5 与这个槽位对应；默认 map_idx=0 选择
++	 * HP_SYS_CLKRST。复用已有 assert/deassert 回调：置 bit 2 / 清 bit 2。
++	 * 这里只描述控制方法，实际复位由 SPI probe 的消费者调用触发。
++	 */
++	[ESP_S31_RST_GPSPI2] = {
++		.reg = ESP32S31_HP_CLKRST_GPSPI2_CTRL0,
++		.mask = ESP32S31_GPSPI2_RST_EN,
++	},
+ };
+ 
+ struct esp_s31_reset {
+diff --git a/drivers/spi/spi-esp32s31.c b/drivers/spi/spi-esp32s31.c
+index c83b4e6ac..fe478ec56 100644
+--- a/drivers/spi/spi-esp32s31.c
++++ b/drivers/spi/spi-esp32s31.c
+@@ -2,32 +2,275 @@
+ /*
+  * Espressif ESP32-S31 GPSPI2 controller driver.
+  *
+- * Stage 1: platform driver registration and Device Tree matching only.
+- * No register is touched yet, so probing is safe even before the GPSPI2
+- * base address and clock gating have been confirmed on hardware.
++ * Hardware initialization stage:
++ * MMIO mapping, clocks, reset and command-register inspection.
+  *
+  * Copyright (C) 2026 Espressif Systems (Shanghai) CO LTD
+  */
+ 
++/*
++ * 阶段一学习导航：设备树资源 -> 私有数据 -> BUS 时钟 -> 复位 ->
++ * CORE 工作时钟 -> 解除复位 -> CMD 只读检查。
++ * 本阶段还没有注册 spi_controller、配置引脚或发送数据。
++ * 初始化日志只说明控制流程执行到末尾；收发功能需后续单独实测。
++ */
++/*
++ * 阶段一：时钟消费者接口；控制动作由 clk-esp32s31.c 的 provider 完成。
++ */
++#include <linux/clk.h>
++/*
++ * 阶段一：设备对象、dev_err_probe 和托管清理动作所需接口。
++ */
++#include <linux/device.h>
++/*
++ * 阶段一：IS_ERR/PTR_ERR 处理“错误编码在指针中”的内核返回值。
++ */
++#include <linux/err.h>
++/*
++ * 阶段一：MMIO 映射与 readl；设备寄存器不能按普通内存指针随意访问。
++ */
++#include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
++/*
++ * 阶段一：复位消费者接口；最终位操作由 reset provider 完成。
++ */
++#include <linux/reset.h>
++/*
++ * 阶段一：devm_kzalloc 的内存申请接口，给私有数据分配并清零存储。
++ */
++#include <linux/slab.h>
++
++
++/*
++ * 阶段一：SPI 自身 CMD 寄存器偏移，依据 ESP-IDF 的 SPI_CMD_REG；
++ * 它与时钟复位模块中的 0x06c 是两个不同窗口的偏移。
++ */
++#define ESP32S31_SPI_CMD		0x00
++/*
++ * 阶段一：与时钟 provider 的 40 MHz / 2 / 1 策略保持一致，单位 Hz。
++ * 用于发现配置不一致；不表示已经产生 20 MHz SCK。
++ */
++#define ESP32S31_SPI_CORE_RATE	20000000UL
++
++/*
++ * 阶段一：每个设备实例独立保存资源，避免 base 只存在于 probe 局部。
++ * 结构体存的是资源句柄，不是直接覆盖硬件寄存器的位域结构体。
++ */
++struct esp32s31_spi {
++	/*
++	 * 阶段一：保存设备身份，供日志和清理函数使用；这里不创建新设备。
++	 */
++	struct device *dev;
++	/*
++	 * 阶段一：保存映射后的 SPI 寄存器窗口地址；__iomem 标记 MMIO。
++	 */
++	void __iomem *base;
++	/*
++	 * 阶段一：BUS 时钟句柄，管理 SYS/APB 两个访问门控。
++	 */
++	struct clk *bus_clk;
++	/*
++	 * 阶段一：CORE 时钟句柄，管理固定 20 MHz 的 HS/MST 工作时钟。
++	 */
++	struct clk *core_clk;
++	/*
++	 * 阶段一：独占复位句柄，防止其他消费者同时接管同一复位线。
++	 */
++	struct reset_control *rst;
++};
+ 
++/*
++ * 阶段一：配对撤销 probe 已完成的硬件动作。
++ * 先在访问时钟仍有效时置于复位，再关 CORE，最后关 BUS。
++ * 可由显式失败分支调用，也可由 devm 清理动作在解绑/后续失败时调用。
++ * 这里的 power_off 是驱动资源回收，不是关闭整块开发板电源。
++ */
++static void esp32s31_spi_power_off(void *data)
++{
++	/*
++	 * 阶段一：devm action 要求 void (*)(void *) 形式；把登记时传入的
++	 * 私有数据还原为原类型，才能取得要关闭的时钟和复位句柄。
++	 */
++	struct esp32s31_spi *es = data;
++	int ret;
++
++	/*
++	 * 阶段一：清理时尝试把控制器停在复位状态；失败也记录警告，
++	 * 随后继续配对减少本驱动持有的时钟使能计数，避免漏掉资源回收。
++	 */
++	ret = reset_control_assert(es->rst);
++	if (ret)
++		dev_warn(es->dev, "failed to assert reset: %d\n", ret);
++
++	clk_disable_unprepare(es->core_clk);
++	clk_disable_unprepare(es->bus_clk);
++}
++
++/*
++ * 阶段一：设备树匹配成功后，platform 总线传入 pdev 并调用这里。
++ * 先取得全部句柄，再逐步启用硬件；每条失败路径只撤销已完成的动作。
++ */
+ static int esp32s31_spi_probe(struct platform_device *pdev)
+ {
+-	dev_info(&pdev->dev, "matched, hardware support not implemented yet\n");
++	/*
++	 * 阶段一：简写同一个设备对象，供 devm 资源和日志接口关联生命周期。
++	 */
++	struct device *dev = &pdev->dev;
++	struct esp32s31_spi *es;
++	unsigned long rate;
++	u32 cmd;
++	int ret;
+ 
+-	void __iomem *base;
++	/*
++	 * 阶段一：申请一个私有数据实例并清零，失败返回 -ENOMEM。
++	 * GFP_KERNEL 允许睡眠，适用于此处 probe 上下文；devm 托管内存释放。
++	 */
++	es = devm_kzalloc(dev, sizeof(*es), GFP_KERNEL);
++	if (!es)
++		return -ENOMEM;
++
++	/*
++	 * 阶段一：让稍后只拿到 es 的清理函数也能输出所属设备的日志。
++	 */
++	es->dev = dev;
++
++	/*
++	 * 阶段一：取设备树 reg 的第一段 MMIO 资源，申请区域并建立映射。
++	 * 0 是资源索引，不是物理地址；失败用 IS_ERR/PTR_ERR 而非只判 NULL。
++	 * dev_err_probe 保留原始错误码，包括 provider 未就绪时的延迟探测。
++	 */
++	es->base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(es->base))
++		return dev_err_probe(dev, PTR_ERR(es->base),
++				     "failed to map registers\n");
++
++	/*
++	 * 阶段一：按 DTS 的 clock-names 找到 BUS 句柄；此时还没有开时钟。
++	 * devm_clk_get 只托管句柄释放，不能代替 clk_disable_unprepare。
++	 */
++	es->bus_clk = devm_clk_get(dev, "bus");
++	if (IS_ERR(es->bus_clk))
++		return dev_err_probe(dev, PTR_ERR(es->bus_clk),
++				     "failed to get bus clock\n");
++
++	/*
++	 * 阶段一：找到 CORE 句柄，其专用 prepare 回调负责配置两级预分频。
++	 */
++	es->core_clk = devm_clk_get(dev, "core");
++	if (IS_ERR(es->core_clk))
++		return dev_err_probe(dev, PTR_ERR(es->core_clk),
++				     "failed to get core clock\n");
+ 
+-	base = devm_platform_ioremap_resource(pdev, 0);
+-	if(IS_ERR(base))
+-		return PTR_ERR(base);
++	/*
++	 * 阶段一：按 reset-names 的 spi 获取独占句柄；此处尚未改变复位位。
++	 * devm 托管句柄释放，不自动承包本驱动随后的 assert/deassert 动作。
++	 */
++	es->rst = devm_reset_control_get_exclusive(dev, "spi");
++	if (IS_ERR(es->rst))
++		return dev_err_probe(dev, PTR_ERR(es->rst),
++				     "failed to get reset\n");
+ 
+-	dev_info(&pdev->dev,"register window mapped\n");
++	/*
++	 * 阶段一：先为寄存器访问开启 SYS/APB；失败时没有成功开启的
++	 * 硬件时钟需要由本驱动关闭，可直接返回。
++	 */
++	ret = clk_prepare_enable(es->bus_clk);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "failed to enable bus clock\n");
++
++	/*
++	 * 阶段一：让控制器进入复位状态，消除前一使用者留下的运行状态。
++	 * provider 将 HP_SYS_CLKRST+0x06c 的 bit 2 置 1；失败只回收 BUS。
++	 */
++	ret = reset_control_assert(es->rst);
++	if (ret)
++		goto err_bus;
++
++	/*
++	 * 阶段一：在复位状态下配置并开启工作时钟，触发 provider 的
++	 * 专用 prepare：选 XTAL，HS 除 2、MST 除 1，开启两个 CORE 门控。
++	 * 若调用失败，框架撤销此次失败的使能过程，这里回收之前成功的 BUS。
++	 */
++	ret = clk_prepare_enable(es->core_clk);
++	if (ret)
++		goto err_bus;
++
++	/*
++	 * 阶段一：工作时钟准备好后清 bit 2，让控制器退出复位。
++	 * 若失败，BUS/CORE 都已开启，必须走 err_core 回收两者。
++	 */
++	ret = reset_control_deassert(es->rst);
++	if (ret)
++		goto err_core;
++
++	/*
++	 * Register cleanup after both clocks are enabled.
++	 * On registration failure, this helper runs cleanup immediately.
++	 */
++	/*
++	 * 阶段一：登记自定义硬件清理动作。登记成功后，后续 probe 失败
++	 * 或设备解绑时会自动调用 power_off；登记失败则立即执行一次。
++	 * 因此此处失败直接返回，不能再手动关闭同一组时钟。
++	 * 托管资源按逆序释放，动作登记在句柄之后，可先清理硬件再释放句柄。
++	 */
++	ret = devm_add_action_or_reset(dev, esp32s31_spi_power_off, es);
++	if (ret)
++		return dev_err_probe(dev, ret,
++				     "failed to register cleanup\n");
++
++	/*
++	 * 阶段一：检查 provider 根据父频率和实际分频字段计算的结果。
++	 * 不缓存标志使其重新读取字段；读失败、选源不符或频率异常会报错。
++	 * 这里的 return 不走 goto，已登记的 devm action 会负责回收时钟。
++	 */
++	rate = clk_get_rate(es->core_clk);
++	if (rate != ESP32S31_SPI_CORE_RATE)
++		return dev_err_probe(dev, -EINVAL,
++				     "unexpected core clock rate: %lu\n",
++				     rate);
++
++	/*
++	 * 阶段一：时钟/复位处理完成后，读取 SPI 自身的 CMD 寄存器。
++	 * 这里只读，不写 UPDATE/USR，不启动传输；读到某个数值本身也不能
++	 * 证明 SPI 收发功能正确，后续还要检查配置、引脚和实际波形。
++	 */
++	cmd = readl(es->base + ESP32S31_SPI_CMD);
++
++	/*
++	 * 阶段一：把私有数据指针关联到设备；其他拿到 pdev 的路径以后
++	 * 可以用 platform_get_drvdata 取回，不会复制结构体或寄存器内容。
++	 */
++	platform_set_drvdata(pdev, es);
++
++	/*
++	 * 阶段一验收日志：说明资源获取、时钟启用、复位控制和 CMD 读取
++	 * 均执行到了末尾；core 是计算频率，CMD 是只读检查结果。
++	 * 编译成功不等于已见到这条日志；本阶段仍未注册 SPI 总线及进行收发。
++	 */
++	dev_info(dev, "hardware init ready: core=%lu Hz, CMD=0x%08x\n",
++		 rate, cmd);
+ 
+ 	return 0;
++
++/*
++ * 阶段一失败出口：解除复位失败时，两个时钟都已开启，
++ * 且 devm action 尚未登记，因此必须手动完整回收一次。
++ */
++err_core:
++	esp32s31_spi_power_off(es);
++	return dev_err_probe(dev, ret, "failed to release reset\n");
++
++/*
++ * 阶段一失败出口：BUS 开启后、CORE 成功开启前失败，仅关闭 BUS。
++ * 不关闭未成功开启的 CORE；原始 ret 保留给调用者判断失败原因。
++ */
++err_bus:
++	clk_disable_unprepare(es->bus_clk);
++	return dev_err_probe(dev, ret,
++			     "failed to assert reset or enable core clock\n");
+ }
+ 
+ static const struct of_device_id esp32s31_spi_of_match[] = {
+diff --git a/include/dt-bindings/clock/esp32s31.h b/include/dt-bindings/clock/esp32s31.h
+index 0a2825626..ba868cac8 100644
+--- a/include/dt-bindings/clock/esp32s31.h
++++ b/include/dt-bindings/clock/esp32s31.h
+@@ -33,6 +33,22 @@
+ /* EMAC PTP reference clock (CNNT_SYS HP_EMAC_PTP_CTRL) */
+ #define ESP_S31_CLK_EMAC_PTP	10
+ 
+-#define ESP_S31_CLK_NUM		11
++/*
++ * 阶段一：给 GPSPI2 新增总线时钟和工作时钟两个资源编号。
++ * 这些编号是设备树 ABI：DTS 的 <&clk 编号> 用它索引时钟描述表，
++ * 不是寄存器偏移或位编号。已有 0～10 保持不变，新资源只向后追加。
++ * BUS 合并 SYS/APB 门控，供寄存器访问使用；CORE 合并 HS/MST 门控，
++ * 由专用回调配置晶振和两级预分频；它还不是外部 SCK 引脚的频率。
++ */
++#define ESP_S31_CLK_GPSPI2_BUS  11
++#define ESP_S31_CLK_GPSPI2_CORE 12
++
++/*
++ * 阶段一：编号为 0～12，共 13 项；用于分配并遍历 provider 的描述表。
++ * 只增加编号、不同步总数和描述表，会造成资源无法正确注册。
++ */
++#define ESP_S31_CLK_NUM		13
++
++
+ 
+ #endif /* ESP32S31_CLOCK_H */
+diff --git a/include/dt-bindings/reset/esp32s31.h b/include/dt-bindings/reset/esp32s31.h
+index bae2edb1e..924db899b 100644
+--- a/include/dt-bindings/reset/esp32s31.h
++++ b/include/dt-bindings/reset/esp32s31.h
+@@ -21,6 +21,16 @@
+ /* USB OTG-HS PHY, AHB and APB resets (CNNT_SYS USB_OTG20_CTRL) */
+ #define ESP_S31_RST_USB_OTGHS	4
+ 
+-#define ESP_S31_RST_NUM		5
++/*
++ * 阶段一：新增 GPSPI2 的独立复位编号，DTS 的 <&rst 编号> 与它对应。
++ * 编号 5 是软件索引；硬件位由 reset-esp32s31.c 中的描述表决定。
++ */
++/* GPSPI2 peripheral reset */
++#define ESP_S31_RST_GPSPI2	5
++
++/*
++ * 阶段一：原有 0～4 加上 GPSPI2 的 5，共 6 条复位资源。
++ */
++#define ESP_S31_RST_NUM		6
+ 
+ #endif /* ESP32S31_RESET_H */
