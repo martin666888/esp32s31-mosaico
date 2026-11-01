@@ -1,10 +1,29 @@
 # ESP32-S31 / ESP-Mosaico V1.2 Linux 学习工程
 
-本仓库管理 Mosaico 的板级配置、内核补丁、构建辅助脚本和阶段说明。RK3588 是构建与调试主机，ESP32-S31 是 Linux 运行目标。工程当前路径为 `/userdata/esp32s31`。
+GitHub：[martin666888/esp32s31-mosaico](https://github.com/martin666888/esp32s31-mosaico)
+
+本项目基于乐鑫官方 BSP，在 ESP-Mosaico V1.2 上学习和开发 ESP32-S31 Linux 系统及驱动。RK3588 ARM64 是编译与调试主机，ESP32-S31 是 Linux 运行目标。
+
+硬件环境：16 MiB PSRAM、16 MiB NOR；系统采用 Linux 6.18、Buildroot 2025.02、XIP 内核、只读 cramfs 与可写 tmpfs。已实现串口 Shell、USB NCM 网络、DHCP 和 Dropbear 公钥 SSH，GPSPI2 正在分阶段开发。仓库保存板级配置、内核补丁、构建辅助脚本和学习说明。
+
+当前是开发中的学习工程。GPIO 路由、SPI 数据传输、Quad 和屏幕驱动仍待实现；GPSPI2 初始化成功不代表屏幕已可使用。
 
 **第一阶段 GPSPI2 硬件初始化已完成上板验证；下一步是最小单线 PIO 发送。** 先读下方当前进度，再按 [学习路线](docs/学习路线.md) 继续。源码版本管理方法见 [Linux 源码 Git](docs/LINUX-DEVELOPMENT.md)。
 
 根仓库第一笔提交是 2026-10-26 接手时的现状快照，不代表此前工作在这一天完成，也不是过去开发历史的重建。
+
+## 获取与构建前提
+
+本机已验证的工程位置为 `/userdata/esp32s31`；现有脚本、锁文件和 defconfig 含此绝对路径，暂未适配任意目录。源码下载位置和版本见 [sources.lock.json](sources.lock.json)，官方源码重建依据见 [official-patches/source-reconstruction.json](official-patches/source-reconstruction.json)。
+
+从 GitHub 克隆后仍需准备以下本机输入：
+
+- 按锁文件准备 `sources/`、`archives/`，并核对归档摘要；仓库不包含上游完整源码或下载缓存。
+- 准备对应 ARM64 工具链、Buildroot 依赖及支持 ESP32-S31 的 esptool/Python 环境；现有构建脚本使用 `.venv/bin/esptool`。
+- 使用 USB 变体 `mosaico-usb-external` 的 defconfig；两套变体共用输出目录，文件名不会自动切换配置。
+- 自行生成设备 SSH 主机密钥与客户端密钥，按自己的设备配置授权公钥和主机指纹；这些身份材料不随仓库发布。现有烧录辅助脚本还依赖本机候选、设备身份和恢复备份，不能当作通用刷写入口直接运行。
+
+完整 NOR 镜像、工具链、缓存、私钥及本机备份均不在仓库中；现阶段没有承诺从空目录执行单条命令即可完成构建。增量开发与构建命令见下文，USB 操作记录见 [USB SSH 说明](USB-SSH-STATUS.md)。
 
 ## 当前进度（2026-10-31）
 
@@ -150,3 +169,29 @@ git diff
 本次验证了补丁链和源码一致性，没有重新编译整套系统或烧录。现有工作树和固件保持原状。后续新增实现仍需重新导出对应补丁。
 
 执行 `linux-dirclean` 或从基线重新解包之前，必须完成所需版本保存和补丁整理。否则即便源码 Git 历史仍在，Buildroot 也不会自动把最新实现重新加入固件。
+
+## 日常开发与 GitHub 同步
+
+源码 Git 与项目 Git 是两个独立仓库。先在 `output-mosaico/build/linux-custom` 保存并验证源码，再将新增提交导出为后续编号的补丁，最后在项目仓库提交补丁、配置或文档并推送。仅提交 Linux 源码不会自动同步项目仓库；源码仓库历史也不随本项目一同发布。
+
+```sh
+cd /userdata/esp32s31
+git status --short
+git diff
+# 审阅后只暂存本次相关文件，再提交
+git add -- <本次修改的文件>
+git commit -m "说明本次修改与验证结果"
+git push origin main
+```
+
+首次推送前需配置 GitHub 远端与本机认证。后续贡献归属取决于提交邮箱与 GitHub 账号的关联；可以使用账号设置中的 GitHub 隐私邮箱。保留历史提交的原始作者、时间与验证边界，不为贡献图修改历史。
+
+## 上游来源与许可证
+
+本仓库的原创新增脚本、配置修改和学习文档采用 GPL-2.0-only，许可证正文见 [LICENSE](LICENSE)。文件已有的 SPDX 标识、版权和上游许可证优先；本仓库的许可证不改写第三方代码的授权。
+
+- Linux 与 Linux 补丁保留 Linux 上游及文件级许可；U-Boot 补丁保留对应上游和文件级许可。
+- 两套 `mosaico-*-external` 树基于乐鑫 `esp-buildroot-external` 的锁定版本进行适配；该版本未附根许可证文件，本项目不将继承内容另行声明为原创或替其指定许可。版本与仓库地址见 `sources.lock.json`。
+- Buildroot、OpenSBI、工具链、esp-linux-bsp 等外部依赖分别保留其原有许可；依赖并未作为完整源码或二进制随本仓库发布。
+
+本项目是个人学习与适配工程，与乐鑫官方 BSP 保持来源区分，不代表官方维护或完整外设支持。

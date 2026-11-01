@@ -14,11 +14,7 @@ RK3588:
 bash /userdata/esp32s31/scripts/ssh-mosaico.sh
 ```
 
-Windows launcher:
-
-```powershell
-& 'D:\rk3588-debian12-deploy-20260917\esp32s31-mosaico\Connect-Mosaico.cmd'
-```
+Windows uses the local OpenSSH client with the dedicated device identity. The historical `Connect-Mosaico.cmd` launcher belongs to the private Windows workspace and is not distributed in this repository.
 
 Exit with `exit`. The root filesystem is read-only; `/tmp` is writable RAM storage cleared on power loss.
 
@@ -71,6 +67,6 @@ RK3588 NetworkManager originally excluded Ethernet devices. `/etc/NetworkManager
 
 ## Recovery
 
-Original NOR backup remains verified: SHA256 `fc4aa95dd3483e68d2cf06729e72eba7d906fdffd81de06dc5ae767b66fc9a83`. See `FACTORY-RECOVERY.md`. UART-only Linux remains in `/userdata/esp32s31/backups/uart-linux-20261019/` and locally as `s31_full_flash.bin`.
+Original NOR backup remains verified: SHA256 `fc4aa95dd3483e68d2cf06729e72eba7d906fdffd81de06dc5ae767b66fc9a83`. Recovery instructions and backups are kept in the private local workspace; they are not distributed in this repository. UART-only Linux remains in `/userdata/esp32s31/backups/uart-linux-20261019/` and locally as `s31_full_flash.bin`.
 
-Use frozen candidate files for subsequent flashes. `/userdata/esp32s31/checks/usb-flash-plan.json` currently selects `/userdata/esp32s31/checks/usb-candidate-3212a0c4e87a/`. `flash-usb-update.py` updates kernel and DTB, then compares the complete image. A fresh physical ROM download-mode entry is required.
+Use frozen candidate files for subsequent flashes. The plan used for this 2026-10-19 record selected `/userdata/esp32s31/checks/usb-candidate-3212a0c4e87a/`; read the current local plan and root README for subsequent candidates. `flash-usb-update.py` updates kernel and DTB, then compares the complete image. A fresh physical ROM download-mode entry is required.

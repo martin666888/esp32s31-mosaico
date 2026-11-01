@@ -4,6 +4,7 @@
 !/.gitattributes
 !/AGENTS.md
 !/README.md
+!/LICENSE
 !/USB-SSH-STATUS.md
 !/sources.lock.json
 !/archives.lock.json
