@@ -9,7 +9,7 @@
 | /userdata/esp32s31 | 补丁、配置、工程脚本和说明 |
 | /userdata/esp32s31/output-mosaico/build/linux-custom | Linux 源码；编辑驱动、Kconfig、Makefile 后可直接看 diff |
 
-Linux 仓库分支：codex/linux-learning。Git 数据实际保存在 /userdata/esp32s31/.linux-dev-git；构建目录中的 .git 是指向该目录的文本文件。两套仓库都未配置远端，不会自动推送。
+Linux 仓库分支：codex/linux-learning。Git 数据实际保存在 /userdata/esp32s31/.linux-dev-git；构建目录中的 .git 是指向该目录的文本文件。2026-11-01 项目根仓库已配置 GitHub 远端并发布到 https://github.com/martin666888/esp32s31-mosaico；Linux 源码仓库没有配置远端，源码提交仍需导出成补丁后，在项目仓库中提交并推送。
 
 初始化时从现有 sources/linux 暂存的官方基线复制 Git 对象及索引，再只在新仓库索引中依次应用 0001～0006。产生的是今天重建的基线快照及六笔补丁提交，不是找回了前任真实开发历史，也不是原始官方 commit。设置过程没有把源码切换回旧版本，没有修改用户代码。
 
