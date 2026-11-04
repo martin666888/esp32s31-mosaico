@@ -1,0 +1,400 @@
+From 2ae173b0966af064c11a7d5c84074758a5d4c28c Mon Sep 17 00:00:00 2001
+From: "martin.ma" <109634003+martin666888@users.noreply.github.com>
+Date: Wed, 4 Nov 2026 21:37:58 +0800
+Subject: [PATCH] spi: esp32s31: add polling single-byte PIO self-test
+
+Configure master PIO, Mode 0, single-line MSB-first transmission and
+a target SCK of 1 MHz from the 20 MHz controller clock. Reset the TX
+FIFO, load one byte (0x96), synchronize UPDATE and trigger USR.
+Bound polling waits and check TRANS_DONE and FIFO error status.
+
+Validation: driver object built with W=1 and Buildroot linux-rebuild
+passed. The user built, staged and flashed candidate 376644fa2fec;
+the flash script reported full-image digest verification success.
+On 2026-11-04 the user supplied these boot messages over USB SSH:
+
+PIO test completed: data=0x96, bytes=1, target_sck=1000000 Hz,
+CMD=0x00000000, RAW=0x00001000
+hardware init ready: core=20000000 Hz, CMD=0x00000000
+
+This validates controller completion only. GPIO routing, external
+waveforms, slave reception and SPI controller registration are not
+implemented or verified by this self-test.
+---
+ drivers/spi/spi-esp32s31.c | 312 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 299 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/spi/spi-esp32s31.c b/drivers/spi/spi-esp32s31.c
+index fe478ec56..bc369eda3 100644
+--- a/drivers/spi/spi-esp32s31.c
++++ b/drivers/spi/spi-esp32s31.c
+@@ -2,8 +2,8 @@
+ /*
+  * Espressif ESP32-S31 GPSPI2 controller driver.
+  *
+- * Hardware initialization stage:
+- * MMIO mapping, clocks, reset and command-register inspection.
++ * Learning stages one and two:
++ * MMIO, clocks, reset and a polling-based single-byte PIO self-test.
+  *
+  * Copyright (C) 2026 Espressif Systems (Shanghai) CO LTD
+  */
+@@ -11,8 +11,10 @@
+ /*
+  * 阶段一学习导航：设备树资源 -> 私有数据 -> BUS 时钟 -> 复位 ->
+  * CORE 工作时钟 -> 解除复位 -> CMD 只读检查。
+- * 本阶段还没有注册 spi_controller、配置引脚或发送数据。
+- * 初始化日志只说明控制流程执行到末尾；收发功能需后续单独实测。
++ * 阶段二追加：Mode 0、目标 SCK 1 MHz、单线 MSB first，装入 0x96，
++ * UPDATE -> USR -> 有超时地等待结束，并核对完成/FIFO 错误状态。
++ * 当前在 probe 中执行一次控制器自检；尚未注册 spi_controller 或路由引脚。
++ * 控制器完成标志不能代替引脚波形、从设备接收和屏幕功能验证。
+  */
+ /*
+  * 阶段一：时钟消费者接口；控制动作由 clk-esp32s31.c 的 provider 完成。
+@@ -41,19 +43,84 @@
+  * 阶段一：devm_kzalloc 的内存申请接口，给私有数据分配并清零存储。
+  */
+ #include <linux/slab.h>
+-
++#include <linux/bits.h>
++#include <linux/iopoll.h>
++#include <linux/bitfield.h>
+ 
+ /*
+  * 阶段一：SPI 自身 CMD 寄存器偏移，依据 ESP-IDF 的 SPI_CMD_REG；
+  * 它与时钟复位模块中的 0x06c 是两个不同窗口的偏移。
+  */
+ #define ESP32S31_SPI_CMD		0x00
++#define ESP32S31_SPI_CMD_USR    BIT(24)
++#define ESP32S31_SPI_CMD_UPDATE BIT(23)
++
++#define ESP32S31_SPI_SLAVE          0xe0
++#define ESP32S31_SPI_SLAVE_MODE     BIT(26)
++
++#define ESP32S31_SPI_DMA_CONF       0x30
++#define ESP32S31_SPI_DMA_TX_ENA     BIT(28)
++#define ESP32S31_SPI_DMA_RX_ENA     BIT(27)
++
++#define ESP32S31_SPI_MISC_REG       0x20
++#define ESP32S31_SPI_CK_IDLE_EDGE   BIT(29)
++
++#define ESP32S31_SPI_USER_REG       0x10
++#define ESP32S31_SPI_CK_OUT_EDGE    BIT(9)
+ /*
+  * 阶段一：与时钟 provider 的 40 MHz / 2 / 1 策略保持一致，单位 Hz。
+  * 用于发现配置不一致；不表示已经产生 20 MHz SCK。
+  */
+ #define ESP32S31_SPI_CORE_RATE	20000000UL
+ 
++#define ESP32S31_SPI_CLOCK_REG         0x0c
++#define ESP32S31_SPI_CLKCNT_L          GENMASK(5, 0)
++#define ESP32S31_SPI_CLKCNT_H          GENMASK(11, 6)
++#define ESP32S31_SPI_CLKCNT_N          GENMASK(17, 12)
++#define ESP32S31_SPI_CLKDIV_PRE        GENMASK(21, 18)
++#define ESP32S31_SPI_CLK_EQU_SYSCLK    BIT(31)
++
++#define ESP32S31_SPI_USR_MOSI       BIT(27)
++#define ESP32S31_SPI_USR_MISO       BIT(28)
++#define ESP32S31_SPI_USR_DUMMY      BIT(29)
++#define ESP32S31_SPI_USR_ADDR       BIT(30)
++#define ESP32S31_SPI_USR_COMMAND    BIT(31)
++
++#define ESP32S31_SPI_CTRL_REG          0x08
++#define ESP32S31_SPI_WR_BIT_ORDER      GENMASK(26, 25)
++
++#define ESP32S31_SPI_DOUTDIN           BIT(0)
++#define ESP32S31_SPI_QPI_MODE          BIT(3)
++#define ESP32S31_SPI_OPI_MODE          BIT(4)
++#define ESP32S31_SPI_FWRITE_DUAL       BIT(12)
++#define ESP32S31_SPI_FWRITE_QUAD       BIT(13)
++#define ESP32S31_SPI_FWRITE_OCT        BIT(14)
++#define ESP32S31_SPI_SIO               BIT(17)
++#define ESP32S31_SPI_USR_MOSI_HIGHPART  BIT(25)
++
++#define ESP32S31_SPI_MS_DLEN_REG     0x1c
++#define ESP32S31_SPI_MS_DATA_BITLEN  GENMASK(17, 0)
++#define ESP32S31_SPI_W0_REG          0x98
++#define ESP32S31_SPI_BUF_AFIFO_RST   BIT(30)
++
++/*
++ * 阶段二：官方 spi_reg.h 的 RAW/CLR 状态位布局相同。
++ * 即使寄存器名称带 DMA，TRANS_DONE 和主机 BUF AFIFO 错误也用于 PIO。
++ * CLR 是写 1 清除，不做普通的 read-modify-write。
++ */
++#define ESP32S31_SPI_DMA_INT_ENA     0x34
++#define ESP32S31_SPI_DMA_INT_CLR     0x38
++#define ESP32S31_SPI_DMA_INT_RAW     0x3c
++#define ESP32S31_SPI_TRANS_DONE      BIT(12)
++#define ESP32S31_SPI_RX_FIFO_FULL    BIT(17)
++#define ESP32S31_SPI_TX_FIFO_EMPTY   BIT(18)
++#define ESP32S31_SPI_PIO_ERROR_MASK  (ESP32S31_SPI_RX_FIFO_FULL | \
++                                     ESP32S31_SPI_TX_FIFO_EMPTY)
++#define ESP32S31_SPI_PIO_STATUS_MASK (ESP32S31_SPI_TRANS_DONE | \
++                                     ESP32S31_SPI_PIO_ERROR_MASK)
++#define ESP32S31_SPI_POLL_US         1
++#define ESP32S31_SPI_TIMEOUT_US      10000
++
+ /*
+  * 阶段一：每个设备实例独立保存资源，避免 base 只存在于 probe 局部。
+  * 结构体存的是资源句柄，不是直接覆盖硬件寄存器的位域结构体。
+@@ -81,6 +148,206 @@ struct esp32s31_spi {
+ 	struct reset_control *rst;
+ };
+ 
++static int esp32s31_spi_wait_idle(struct esp32s31_spi *es)
++{
++	u32 cmd;
++
++	/* 阶段二：等 USR 由硬件清零；超时返回 -ETIMEDOUT。 */
++	return readl_poll_timeout(es->base + ESP32S31_SPI_CMD, cmd,
++				  !(cmd & ESP32S31_SPI_CMD_USR),
++				  ESP32S31_SPI_POLL_US,
++				  ESP32S31_SPI_TIMEOUT_US);
++}
++
++static int esp32s31_spi_apply_config(struct esp32s31_spi *es)
++{
++	u32 cmd;
++
++	cmd = readl(es->base + ESP32S31_SPI_CMD);
++	if (cmd & (ESP32S31_SPI_CMD_USR | ESP32S31_SPI_CMD_UPDATE))
++		return -EBUSY;
++
++	writel(cmd | ESP32S31_SPI_CMD_UPDATE, es->base + ESP32S31_SPI_CMD);
++
++	return readl_poll_timeout(es->base + ESP32S31_SPI_CMD, cmd,
++				  !(cmd & ESP32S31_SPI_CMD_UPDATE),
++				  ESP32S31_SPI_POLL_US,
++				  ESP32S31_SPI_TIMEOUT_US);
++}
++
++static void esp32s31_spi_config_pio(struct esp32s31_spi *es)
++{
++	u32 val;
++
++	/* 阶段二只轮询 RAW，不向 CPU 发中断，也无需申请 IRQ。 */
++	writel(0, es->base + ESP32S31_SPI_DMA_INT_ENA);
++
++	val = readl(es->base + ESP32S31_SPI_SLAVE);
++	val &= ~ESP32S31_SPI_SLAVE_MODE;
++	writel(val, es->base + ESP32S31_SPI_SLAVE);
++
++	val = readl(es->base + ESP32S31_SPI_DMA_CONF);
++	val &= ~(ESP32S31_SPI_DMA_TX_ENA |
++		 ESP32S31_SPI_DMA_RX_ENA);
++	writel(val, es->base + ESP32S31_SPI_DMA_CONF);
++}
++
++static void esp32s31_spi_set_mode0(struct esp32s31_spi *es)
++{
++	u32 val;
++
++	val = readl(es->base + ESP32S31_SPI_MISC_REG);
++	val &= ~ESP32S31_SPI_CK_IDLE_EDGE;
++	writel(val, es->base + ESP32S31_SPI_MISC_REG);
++
++	val = readl(es->base + ESP32S31_SPI_USER_REG);
++	val &= ~ESP32S31_SPI_CK_OUT_EDGE;
++	writel(val, es->base + ESP32S31_SPI_USER_REG);
++}
++
++static void esp32s31_spi_set_clock_1mhz(struct esp32s31_spi *es)
++{
++	u32 val;
++
++	val = readl(es->base + ESP32S31_SPI_CLOCK_REG);
++
++	/* 清除旧分频参数，并关闭工作时钟直通。 */
++	val &= ~(ESP32S31_SPI_CLKCNT_L |
++		 ESP32S31_SPI_CLKCNT_H |
++		 ESP32S31_SPI_CLKCNT_N |
++		 ESP32S31_SPI_CLKDIV_PRE |
++		 ESP32S31_SPI_CLK_EQU_SYSCLK);
++
++	/* CORE 20 MHz / 1 / 20，目标 SCK 为 1 MHz。 */
++	val |= FIELD_PREP(ESP32S31_SPI_CLKDIV_PRE, 0) |
++	       FIELD_PREP(ESP32S31_SPI_CLKCNT_N, 19) |
++	       FIELD_PREP(ESP32S31_SPI_CLKCNT_H, 9) |
++	       FIELD_PREP(ESP32S31_SPI_CLKCNT_L, 19);
++
++	writel(val, es->base + ESP32S31_SPI_CLOCK_REG);
++}
++
++static void esp32s31_spi_config_tx_phase(struct esp32s31_spi *es)
++{
++	u32 val;
++
++	val = readl(es->base + ESP32S31_SPI_USER_REG);
++
++	/* 关闭命令、地址、Dummy 和接收阶段。 */
++	val &= ~(ESP32S31_SPI_USR_COMMAND |
++		 ESP32S31_SPI_USR_ADDR |
++		 ESP32S31_SPI_USR_DUMMY |
++		 ESP32S31_SPI_USR_MISO);
++
++	/* 启用发送数据阶段。 */
++	val |= ESP32S31_SPI_USR_MOSI;
++
++	writel(val, es->base + ESP32S31_SPI_USER_REG);
++}
++
++static void esp32s31_spi_config_tx_format(struct esp32s31_spi *es)
++{
++	u32 val;
++
++	/* 发送位顺序：每个字节先发送最高位。 */
++	val = readl(es->base + ESP32S31_SPI_CTRL_REG);
++	val &= ~ESP32S31_SPI_WR_BIT_ORDER;
++	writel(val, es->base + ESP32S31_SPI_CTRL_REG);
++
++	/* 单线、非全双工，并允许从 W0 开始取发送数据。 */
++	val = readl(es->base + ESP32S31_SPI_USER_REG);
++	val &= ~(ESP32S31_SPI_DOUTDIN |
++		 ESP32S31_SPI_QPI_MODE |
++		 ESP32S31_SPI_OPI_MODE |
++		 ESP32S31_SPI_FWRITE_DUAL |
++		 ESP32S31_SPI_FWRITE_QUAD |
++		 ESP32S31_SPI_FWRITE_OCT |
++		 ESP32S31_SPI_SIO |
++		 ESP32S31_SPI_USR_MOSI_HIGHPART);
++	writel(val, es->base + ESP32S31_SPI_USER_REG);
++}
++
++static void esp32s31_spi_prepare_byte(struct esp32s31_spi *es, u8 data)
++{
++	u32 val;
++
++	/* 装入新数据前，先复位 CPU 发送 FIFO。 */
++	val = readl(es->base + ESP32S31_SPI_DMA_CONF);
++	writel(val | ESP32S31_SPI_BUF_AFIFO_RST,
++	       es->base + ESP32S31_SPI_DMA_CONF);
++	writel(val & ~ESP32S31_SPI_BUF_AFIFO_RST,
++	       es->base + ESP32S31_SPI_DMA_CONF);
++
++	/* 本次发送一个字节，即 8 bit，长度字段填写 7。 */
++	val = readl(es->base + ESP32S31_SPI_MS_DLEN_REG);
++	val &= ~ESP32S31_SPI_MS_DATA_BITLEN;
++	val |= FIELD_PREP(ESP32S31_SPI_MS_DATA_BITLEN, 8 - 1);
++	writel(val, es->base + ESP32S31_SPI_MS_DLEN_REG);
++
++	/* 把待发送字节放入 W0 的低 8 位。 */
++	writel((u32)data, es->base + ESP32S31_SPI_W0_REG);
++}
++
++/*
++ * 阶段二：重复的寄存器操作在这里收口。
++ * 调用者必须已装入数据并等待 UPDATE 完成；此函数不负责片选或引脚。
++ * 依据：ESP-IDF spi_ll_user_start / spi_ll_usr_is_done，以及 spi_reg.h。
++ * USR 清零后还检查 TRANS_DONE 和 FIFO 错误，防止把异常结束当作成功。
++ */
++static int esp32s31_spi_start_transfer(struct esp32s31_spi *es)
++{
++	u32 cmd, status;
++	int ret;
++
++	cmd = readl(es->base + ESP32S31_SPI_CMD);
++	if (cmd & (ESP32S31_SPI_CMD_USR | ESP32S31_SPI_CMD_UPDATE))
++		return -EBUSY;
++
++	/* 先清旧状态，保证后面看到的是本笔传输产生的完成/错误。 */
++	writel(ESP32S31_SPI_PIO_STATUS_MASK,
++	       es->base + ESP32S31_SPI_DMA_INT_CLR);
++	ret = readl_poll_timeout(es->base + ESP32S31_SPI_DMA_INT_RAW,
++				 status,
++				 !(status & ESP32S31_SPI_PIO_STATUS_MASK),
++				 ESP32S31_SPI_POLL_US,
++				 ESP32S31_SPI_TIMEOUT_US);
++	if (ret) {
++		dev_err(es->dev, "PIO status did not clear: RAW=0x%08x\n",
++			status);
++		return ret;
++	}
++
++	/* 置 USR 启动；操作结束后由硬件清零，不能由软件代替完成。 */
++	writel(cmd | ESP32S31_SPI_CMD_USR, es->base + ESP32S31_SPI_CMD);
++	ret = esp32s31_spi_wait_idle(es);
++	if (ret) {
++		dev_err(es->dev,
++			"PIO transfer timed out: CMD=0x%08x, RAW=0x%08x\n",
++			readl(es->base + ESP32S31_SPI_CMD),
++			readl(es->base + ESP32S31_SPI_DMA_INT_RAW));
++		return ret;
++	}
++
++	/* RAW 状态跨时钟域更新；同样用有超时的轮询等待。 */
++	ret = readl_poll_timeout(es->base + ESP32S31_SPI_DMA_INT_RAW,
++				 status,
++				 status & ESP32S31_SPI_PIO_STATUS_MASK,
++				 ESP32S31_SPI_POLL_US,
++				 ESP32S31_SPI_TIMEOUT_US);
++	if (ret) {
++		dev_err(es->dev, "PIO completion missing: RAW=0x%08x\n",
++			status);
++		return ret;
++	}
++	if (status & ESP32S31_SPI_PIO_ERROR_MASK) {
++		dev_err(es->dev, "PIO FIFO error: RAW=0x%08x\n", status);
++		return -EIO;
++	}
++
++	/* 保留完成状态，方便 probe 日志复核；下一笔启动前再清除。 */
++	return 0;
++}
++
+ /*
+  * 阶段一：配对撤销 probe 已完成的硬件动作。
+  * 先在访问时钟仍有效时置于复位，再关 CORE，最后关 BUS。
+@@ -232,12 +499,32 @@ static int esp32s31_spi_probe(struct platform_device *pdev)
+ 				     "unexpected core clock rate: %lu\n",
+ 				     rate);
+ 
+-	/*
+-	 * 阶段一：时钟/复位处理完成后，读取 SPI 自身的 CMD 寄存器。
+-	 * 这里只读，不写 UPDATE/USR，不启动传输；读到某个数值本身也不能
+-	 * 证明 SPI 收发功能正确，后续还要检查配置、引脚和实际波形。
+-	 */
++	ret = esp32s31_spi_wait_idle(es);
++	if (ret)
++		return dev_err_probe(dev, ret, "controller stayed busy\n");
++
++	esp32s31_spi_config_pio(es);
++	esp32s31_spi_set_mode0(es);
++	esp32s31_spi_set_clock_1mhz(es);
++	esp32s31_spi_config_tx_phase(es);
++	esp32s31_spi_config_tx_format(es);
++	esp32s31_spi_prepare_byte(es, 0x96);
++
++	ret = esp32s31_spi_apply_config(es);
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to apply config\n");
++
++	/* 阶段二：在 probe 中暂做一次单字节自检，后续迁入 SPI 回调。 */
++	ret = esp32s31_spi_start_transfer(es);
++	if (ret)
++		return dev_err_probe(dev, ret, "PIO test transaction failed\n");
++
++	/* 阶段二：只报告控制器完成，不声明引脚波形或从设备已验证。 */
+ 	cmd = readl(es->base + ESP32S31_SPI_CMD);
++	dev_info(dev,
++		 "PIO test completed: data=0x96, bytes=1, target_sck=1000000 Hz, "
++		 "CMD=0x%08x, RAW=0x%08x\n",
++		 cmd, readl(es->base + ESP32S31_SPI_DMA_INT_RAW));
+ 
+ 	/*
+ 	 * 阶段一：把私有数据指针关联到设备；其他拿到 pdev 的路径以后
+@@ -246,9 +533,8 @@ static int esp32s31_spi_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, es);
+ 
+ 	/*
+-	 * 阶段一验收日志：说明资源获取、时钟启用、复位控制和 CMD 读取
+-	 * 均执行到了末尾；core 是计算频率，CMD 是只读检查结果。
+-	 * 编译成功不等于已见到这条日志；本阶段仍未注册 SPI 总线及进行收发。
++	 * 保留阶段一初始化日志；现在只有阶段二 PIO 自检成功才到达这里。
++	 * core/target_sck 是计算或配置值，尚未实测外部 SPI 波形。
+ 	 */
+ 	dev_info(dev, "hardware init ready: core=%lu Hz, CMD=0x%08x\n",
+ 		 rate, cmd);
+-- 
+2.43.0
+

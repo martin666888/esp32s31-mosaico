@@ -6,9 +6,9 @@ GitHub：[martin666888/esp32s31-mosaico](https://github.com/martin666888/esp32s3
 
 硬件环境：16 MiB PSRAM、16 MiB NOR；系统采用 Linux 6.18、Buildroot 2025.02、XIP 内核、只读 cramfs 与可写 tmpfs。已实现串口 Shell、USB NCM 网络、DHCP 和 Dropbear 公钥 SSH，GPSPI2 正在分阶段开发。仓库保存板级配置、内核补丁、构建辅助脚本和学习说明。
 
-当前是开发中的学习工程。GPIO 路由、SPI 数据传输、Quad 和屏幕驱动仍待实现；GPSPI2 初始化成功不代表屏幕已可使用。
+当前是开发中的学习工程。GPSPI2 单字节 PIO 自检已完成编译、打包、烧录及控制器内部完成状态验证；GPIO 路由、SPI controller 注册、Quad 和屏幕驱动仍待实现。
 
-**第一阶段 GPSPI2 硬件初始化已完成上板验证；下一步是最小单线 PIO 发送。** 先读下方当前进度，再按 [学习路线](docs/学习路线.md) 继续。源码版本管理方法见 [Linux 源码 Git](docs/LINUX-DEVELOPMENT.md)。
+**第一、二阶段已完成控制器内部上板验证。下一步接通引脚和片选，学习 SPI controller 注册与传输回调，再观察实际波形。** 先读下方当前进度，再按 [学习路线](docs/学习路线.md) 继续。源码版本管理方法见 [Linux 源码 Git](docs/LINUX-DEVELOPMENT.md)。
 
 根仓库第一笔提交是 2026-10-26 接手时的现状快照，不代表此前工作在这一天完成，也不是过去开发历史的重建。
 
@@ -25,7 +25,7 @@ GitHub：[martin666888/esp32s31-mosaico](https://github.com/martin666888/esp32s3
 
 完整 NOR 镜像、工具链、缓存、私钥及本机备份均不在仓库中；现阶段没有承诺从空目录执行单条命令即可完成构建。增量开发与构建命令见下文，USB 操作记录见 [USB SSH 说明](USB-SSH-STATUS.md)。
 
-## 当前进度（2026-10-31）
+## 当前进度（2026-11-04）
 
 | 内容 | 已确认的进度 | 验证边界 |
 | --- | --- | --- |
@@ -34,15 +34,28 @@ GitHub：[martin666888/esp32s31-mosaico](https://github.com/martin666888/esp32s3
 | GPSPI2 设备树匹配和 MMIO 映射 | 用户已烧录候选 `08ccdef01198`，整片摘要匹配，并提供 `register window mapped` 启动日志 | 证明驱动绑定及 MMIO 资源映射通过，尚不证明 SPI 收发 |
 | 第一阶段：时钟与复位初始化 | 用户完成编译及上板启动，提供 `hardware init ready: core=20000000 Hz, CMD=0x00000000` 日志，并通过 USB 网络 SSH 登录 | 验证初始化路径；尚不证明 SPI 收发或引脚波形，20 MHz 是根据时钟寄存器计算的频率 |
 | 第一阶段学习注释 | 六个文件已补中文注释；与加注释前相比，去掉注释后的代码逐行一致，`git diff --check` 通过 | 只增加说明，不改变驱动逻辑 |
-| SPI 传输、引脚、Quad、显示 | 后续阶段 | 当前不具备 SPI 收发、屏幕或触摸功能 |
+| 第二阶段：最小单线 PIO 自检 | Mode 0、目标 SCK 1 MHz、MSB first，装入 0x96 后 UPDATE/USR，并有超时等待完成与 FIFO 错误检查；编译、打包和整片刷写校验通过，用户提供 CMD=0、RAW=0x1000 的启动日志 | 证明控制器内部完成；引脚未路由，未验证波形、从设备接收或显示功能，1 MHz 为配置目标 |
+| 引脚、SPI controller、Quad、显示 | 后续阶段 | 接下来学习设备树引脚连接、SPI 框架回调和真实外设传输 |
 
 第一阶段源码已包含：保存私有数据、申请 MMIO/时钟/复位资源、开启 BUS 时钟、置于复位、配置并开启 CORE 时钟、解除复位、读取 CMD、登记失败/解绑清理动作。当前策略为 40 MHz XTAL / 2 / 1 = 20 MHz；这是控制器工作时钟，不是外部 SCK 的实测频率。
 
-当前烧录计划指向 `/userdata/esp32s31/checks/usb-candidate-7ee1702fe290/`：
+2026-11-03 补齐阶段二重复寄存器操作：先清除旧完成/错误状态，启动 USR，等待 USR 清零后再确认本笔 TRANS_DONE 且无主机 FIFO 错误。控制器原始状态通过 RAW 轮询读取，未申请或使能 CPU 中断。调用暂在 probe 内，后续迁入 SPI 框架的传输回调。2026-11-04 用户完成打包、冻结候选和刷写，并通过 USB SSH 提供以下启动日志：
 
-- 计划记录的完整镜像 SHA256：`7ee1702fe29072c9b87c69bd9631bd1115f4c191dbaa63d9f121b00c95a746d2`。此处记录计划内容，不作为本轮整片刷写校验的独立证据。
-- 用户在本次教学对话提供初始化日志：`[    0.392869] esp32s31-spi 2038f000.spi: hardware init ready: core=20000000 Hz, CMD=0x00000000`，并通过 `scripts/ssh-mosaico.sh` 登录板子。
-- 旧候选 `08ccdef01198` 的整片校验及 MMIO 映射记录保留为历史依据，不替代新候选的校验。
+```text
+[    0.410206] esp32s31-spi 2038f000.spi: PIO test completed: data=0x96, bytes=1, target_sck=1000000 Hz, CMD=0x00000000, RAW=0x00001000
+[    0.411295] esp32s31-spi 2038f000.spi: hardware init ready: core=20000000 Hz, CMD=0x00000000
+```
+
+CMD 的 USR 已清零，RAW 的 bit12（TRANS_DONE）置位，代码检查的 FIFO 错误未出现。本次只确认控制器内部完成操作，日志中的 data/bytes 是软件配置，不能据此认定外部器件收到了 0x96。
+
+本次前置源码、工作区差异和编译日志保存在 `/userdata/esp32s31/backups/stage2-pio-fastforward-20261103-212315/`。对象文件 `W=1` 编译无警告，`linux-rebuild` 返回 0；构建树与 images 中的 xipImage/USB DTB 逐字节一致。早先安装阶段有 `.files-list*.before` 缺失的统计提示（Buildroot 包文件统计）。随后用户运行完整构建脚本，结果为 complete / 0，SHA256SUMS 校验通过；源码现已保存为 `2ae173b09` 并导出 `0009` 补丁。
+
+当前烧录计划指向 `/userdata/esp32s31/checks/usb-candidate-376644fa2fec/`：
+
+- 完整镜像 SHA256：`376644fa2fece8e6b43e7856b240b49250e46459d074d0a569fdc22cc39707b9`；保存版本时已重新计算候选文件摘要，与计划一致。
+- 用户提供的刷写输出包含 `Verification successful (digest matched)` 和 `USB update and full image verification passed`；随后通过 `scripts/ssh-mosaico.sh` 登录并提供上述 PIO 成功日志。
+- 内核 SHA256：`a79bbd26bba2dcd8b335c7ab8465e25b39980a8df674d483363c04aec8aa34fe`，冻结候选与当前 images 中的文件一致。
+- 旧候选 `7ee1702fe290` 的初始化日志和 `08ccdef01198` 的 MMIO 映射记录保留为历史依据，不替代新候选的校验。
 - `logs/build-usb.status` / `build-usb.exit` 是完整构建脚本留下的状态；单独执行 `linux-rebuild` 不会刷新它们。判断新固件时必须对应实际执行的那一轮构建。
 
 
@@ -51,7 +64,7 @@ GitHub：[martin666888/esp32s31-mosaico](https://github.com/martin666888/esp32s3
 | 目录或文件 | 用途 | 根仓库是否跟踪 |
 | --- | --- | --- |
 | `mosaico-external/` | UART 启动变体的配置与补丁 | 是，密钥除外 |
-| `mosaico-usb-external/` | 当前 USB NCM / SSH 变体；补丁 0001～0008 已覆盖 GPSPI2 第一阶段初始化 | 是，密钥除外 |
+| `mosaico-usb-external/` | 当前 USB NCM / SSH 变体；补丁 0001～0009 已覆盖 GPSPI2 初始化和单字节 PIO 自检 | 是，密钥除外 |
 | `scripts/` | 配置、构建、候选生成、烧录与验证辅助脚本 | 是；脚本入库不代表授权运行烧录 |
 | `sources.lock.json`、`archives.lock.json` 等锁文件 | 固定上游版本、下载位置和摘要 | 是 |
 | `official-patches/` | 重建官方源码版本的补丁及来源记录 | 是 |
@@ -146,7 +159,7 @@ python3 scripts/stage-usb-candidate.py
 
 第一阶段已收到 `hardware init ready: core=20000000 Hz, CMD=0x00000000` 启动日志及 USB/SSH 登录记录；后续版本上板仍需检查时钟 provider、初始化日志和 USB/SSH。时钟注册数量只证明软件资源注册；频率是根据寄存器计算的值；初始化日志不能代替实际 SPI 波形和收发测试。
 
-下一步按学习路线进入最小单线 PIO 发送，逐步实现 Mode、时钟分频、长度、缓冲区、UPDATE、启动与有超时的完成等待。
+第二阶段控制器内部 PIO 自检已通过。下一步按学习路线接通引脚和片选，注册 SPI controller 并实现传输回调，通过逻辑分析仪核对外部时钟与数据。
 
 ## 源码提交与可重建输入
 
@@ -159,14 +172,15 @@ git diff --check
 git diff
 ```
 
-源码提交不会自动更新构建补丁。本阶段已将两个源码提交导出到 `/userdata/esp32s31/mosaico-usb-external/patches/linux/`：
+源码提交不会自动更新构建补丁。以下源码改动已导出到 `/userdata/esp32s31/mosaico-usb-external/patches/linux/`：
 
 - `0007-esp32s31-gpspi2-dt-mmio.patch`：设备树节点、板级启用及 MMIO 映射。
 - `0008-esp32s31-gpspi2-hardware-init.patch`：时钟/复位资源、初始化实现及学习注释。
+- `0009-esp32s31-gpspi2-pio-selftest.patch`：源码提交 `2ae173b09`，保存第二阶段单字节 PIO 自检和有超时的完成/错误检查。
 
 已在独立 Git 索引中从 `baseline/espressif-linux` 顺序应用 `0001`～`0008`，所得完整源码树与 `37b5e36b3` 完全一致；另用 Buildroot 自身的 `support/scripts/apply-patches.sh` 在临时目录应用八份补丁，13 个涉及文件与当前源码逐字节一致，无 fuzz 或 offset。USB 板级 DTS 原料已同步，UART 原料原本一致。验证证据位于 `/userdata/esp32s31/checks/stage1-patch-export-6hwzcmmm/`。
 
-本次验证了补丁链和源码一致性，没有重新编译整套系统或烧录。现有工作树和固件保持原状。后续新增实现仍需重新导出对应补丁。
+上述第一阶段补丁导出检查没有重新编译整套系统或烧录。2026-11-04 另在独立 Git 索引中从同一基线依次应用 `0001`～`0009`，所得完整源码树与 `2ae173b09` 完全一致，记录位于 `/userdata/esp32s31/checks/stage2-git-save-SwFjODb0/patch-verification.txt`。旧补丁 `0007` 有三行缩进空白警告，未修改历史补丁；应用和源码树比较通过。本次 Git 保存未修改驱动逻辑或重新刷写。后续新增实现仍需重新导出对应补丁。
 
 执行 `linux-dirclean` 或从基线重新解包之前，必须完成所需版本保存和补丁整理。否则即便源码 Git 历史仍在，Buildroot 也不会自动把最新实现重新加入固件。
 
